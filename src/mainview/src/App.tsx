@@ -20,7 +20,6 @@ import { Badge } from "./components/ui/badge";
 import { Button } from "./components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/ui/card";
 import { Input } from "./components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./components/ui/table";
 import { buildLatencyChartRows, type MatrixRow } from "./lib/chart-data";
 import { api, onClashSpeedtestStatus, onProgress } from "./lib/electrobun";
 import { cn } from "./lib/utils";
@@ -301,8 +300,8 @@ export default function App() {
               <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索节点" className="pl-9" />
             </div>
           </CardHeader>
-          <CardContent className="p-0">
-            <div className="border-b border-stone-800 p-5">
+          <CardContent className="p-5">
+            <div>
               <div className="mb-5 flex items-center justify-between gap-4">
                 <div>
                   <h2 className="text-base font-semibold text-stone-100">单站点延迟排行</h2>
@@ -406,44 +405,6 @@ export default function App() {
                 </div>
               ) : null}
             </div>
-            <Table>
-              <TableHeader>
-                <TableRow className="border-stone-800">
-                  <TableHead className="w-[280px]">节点</TableHead>
-                  <TableHead>地区</TableHead>
-                  {DEFAULT_SITES.map((site) => (
-                    <TableHead key={site.id}>{site.name}</TableHead>
-                  ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {matrixRows.map((row) => (
-                  <TableRow key={row.key} className="border-stone-900">
-                    <TableCell>
-                      <div className="font-medium text-stone-100">{row.proxyName}</div>
-                      <div className="text-xs text-stone-500">
-                        {row.proxyType} / {shortenId(row.runId)}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{row.regionLabel}</Badge>
-                    </TableCell>
-                    {DEFAULT_SITES.map((site) => (
-                      <TableCell key={site.id}>
-                        <LatencyPill value={row.values[site.name] ?? "N/A"} />
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))}
-                {!matrixRows.length ? (
-                  <TableRow>
-                    <TableCell colSpan={DEFAULT_SITES.length + 2} className="h-40 text-center text-stone-400">
-                      还没有匹配结果。选择配置并开始测试，或者调整日期/地区筛选。
-                    </TableCell>
-                  </TableRow>
-                ) : null}
-              </TableBody>
-            </Table>
           </CardContent>
         </Card>
       </section>
@@ -547,26 +508,6 @@ function MetricCard({
         </div>
       </CardContent>
     </Card>
-  );
-}
-
-function LatencyPill({ value }: { value: string }) {
-  const status = latencyStatus(value);
-  const icon = status === "fast" ? "●" : status === "usable" ? "●" : status === "slow" ? "▲" : status === "failed" ? "×" : "○";
-  return (
-    <span
-      className={cn(
-        "inline-flex min-w-24 items-center justify-center gap-2 rounded-full px-3 py-1.5 text-sm font-semibold",
-        status === "fast" && "bg-emerald-500/15 text-emerald-200 ring-1 ring-emerald-400/30",
-        status === "usable" && "bg-amber-500/15 text-amber-200 ring-1 ring-amber-400/30",
-        status === "slow" && "bg-red-500/15 text-red-200 ring-1 ring-red-400/30",
-        status === "failed" && "bg-zinc-700/70 text-zinc-300 ring-1 ring-zinc-500/30",
-        status === "missing" && "bg-zinc-900 text-zinc-500 ring-1 ring-zinc-700",
-      )}
-    >
-      <span>{icon}</span>
-      {value}
-    </span>
   );
 }
 
