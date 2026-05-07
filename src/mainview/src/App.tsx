@@ -2,7 +2,10 @@ import {
   Activity,
   AlertTriangle,
   CalendarDays,
+  Check,
   CheckCircle2,
+  Circle,
+  CircleDot,
   Download,
   FileSearch,
   Gauge,
@@ -224,14 +227,38 @@ export default function App() {
                 ) : null}
               </label>
               <div className="space-y-2">
-                <span className="text-sm font-medium text-stone-300">地区预设</span>
-                <div className="flex gap-2">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-medium text-stone-300">地区预设</span>
+                  <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-200">
+                    多选 · {selectedRegionIds.length}/{state.regions.length}
+                  </Badge>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2" role="group" aria-label="地区预设多选">
                   {state.regions.map((region) => (
                     <Button
                       key={region.id}
-                      variant={selectedRegionIds.includes(region.id) ? "default" : "outline"}
+                      type="button"
+                      variant="outline"
+                      role="checkbox"
+                      aria-checked={selectedRegionIds.includes(region.id)}
+                      className={cn(
+                        "h-10 justify-start border-dashed px-3 text-sm",
+                        selectedRegionIds.includes(region.id)
+                          ? "border-emerald-500/55 bg-emerald-500/15 text-emerald-100 hover:bg-emerald-500/20"
+                          : "border-stone-700 bg-stone-950/40 text-stone-300 hover:bg-stone-900",
+                      )}
                       onClick={() => toggleRegion(region.id)}
                     >
+                      <span
+                        className={cn(
+                          "flex h-4 w-4 shrink-0 items-center justify-center rounded border",
+                          selectedRegionIds.includes(region.id)
+                            ? "border-emerald-300 bg-emerald-400 text-emerald-950"
+                            : "border-stone-600 bg-stone-950",
+                        )}
+                      >
+                        {selectedRegionIds.includes(region.id) ? <Check className="h-3 w-3" /> : null}
+                      </span>
                       {region.label}
                     </Button>
                   ))}
@@ -248,25 +275,50 @@ export default function App() {
                 </label>
               </div>
               <div className="space-y-2 lg:col-span-3">
-                <span className="text-sm font-medium text-stone-300">运行批次</span>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-medium text-stone-300">运行批次</span>
+                  <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-200">
+                    单选
+                  </Badge>
+                </div>
+                <div
+                  className="flex flex-wrap gap-2 rounded-md border border-stone-800 bg-black/20 p-2"
+                  role="radiogroup"
+                  aria-label="运行批次单选"
+                >
                   <Button
                     type="button"
-                    variant={selectedRunId === "all" ? "default" : "outline"}
-                    className="h-9 px-3 text-xs"
+                    variant="ghost"
+                    role="radio"
+                    aria-checked={selectedRunId === "all"}
+                    className={cn(
+                      "h-9 px-3 text-xs",
+                      selectedRunId === "all"
+                        ? "bg-amber-500/15 text-amber-100 hover:bg-amber-500/20"
+                        : "text-stone-400 hover:bg-stone-900 hover:text-stone-100",
+                    )}
                     onClick={() => setSelectedRunId("all")}
                   >
+                    {selectedRunId === "all" ? <CircleDot className="h-3.5 w-3.5" /> : <Circle className="h-3.5 w-3.5" />}
                     全部运行
                   </Button>
                   {state.runs.slice(0, 8).map((run) => (
                     <Button
                       key={run.id}
                       type="button"
-                      variant={selectedRunId === run.id ? "default" : "outline"}
-                      className="h-9 max-w-[260px] px-3 text-xs"
+                      variant="ghost"
+                      role="radio"
+                      aria-checked={selectedRunId === run.id}
+                      className={cn(
+                        "h-9 max-w-[260px] px-3 text-xs",
+                        selectedRunId === run.id
+                          ? "bg-amber-500/15 text-amber-100 hover:bg-amber-500/20"
+                          : "text-stone-400 hover:bg-stone-900 hover:text-stone-100",
+                      )}
                       title={run.id}
                       onClick={() => setSelectedRunId(run.id)}
                     >
+                      {selectedRunId === run.id ? <CircleDot className="h-3.5 w-3.5" /> : <Circle className="h-3.5 w-3.5" />}
                       {formatRunOption(run)}
                     </Button>
                   ))}
