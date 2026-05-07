@@ -1,5 +1,6 @@
 import { dirname, isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
+import { validateBinaryInput } from "./runner";
 
 type OpenFileDialogOptions = {
   startingFolder?: string;
@@ -64,6 +65,7 @@ export async function chooseClashSpeedtestBinary({
   });
 
   const selectedPath = paths.map(normalizeSelectedPath).find((path) => path.length > 0);
+  if (selectedPath) validateBinaryInput(selectedPath);
   return selectedPath ?? null;
 }
 

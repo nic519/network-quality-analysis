@@ -1,4 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { chooseClashSpeedtestBinary, chooseConfigFile, chooseExportDirectory } from "./file-dialog";
 
 describe("chooseConfigFile", () => {
@@ -68,20 +71,34 @@ describe("chooseExportDirectory", () => {
 
 describe("chooseClashSpeedtestBinary", () => {
   test("returns the selected binary path", async () => {
+    const root = join(tmpdir(), `latency-file-dialog-${Date.now()}`);
+    const binaryPath = join(root, "clash-speedtest");
+    mkdirSync(root, { recursive: true });
+    writeFileSync(binaryPath, "");
+
     const selected = await chooseClashSpeedtestBinary({
-      currentPath: "/Users/nicholas/Downloads/clash-speedtest",
+      currentPath: binaryPath,
       openFileDialog: async (options) => {
         expect(options).toMatchObject({
-          startingFolder: "/Users/nicholas/Downloads",
+          startingFolder: root,
           canChooseFiles: true,
           canChooseDirectory: false,
           allowsMultipleSelection: false,
         });
-        return ["/Users/nicholas/Downloads/clash-speedtest"];
+        return [binaryPath];
       },
     });
 
-    expect(selected).toBe("/Users/nicholas/Downloads/clash-speedtest");
+    expect(selected).toBe(binaryPath);
+  });
+
+  test("rejects selecting a compressed archive instead of the extracted binary", async () => {
+    await expect(
+      chooseClashSpeedtestBinary({
+        currentPath: "/Users/nicholas/Downloads/clash-speedtest",
+        openFileDialog: async () => ["/Users/nicholas/Downloads/clash-speedtest_Darwin_arm64.tar.gz"],
+      }),
+    ).rejects.toThrow("请选择解压后的 clash-speedtest 可执行文件，不要直接选择压缩包");
   });
 
   test("returns null when binary selection is cancelled", async () => {

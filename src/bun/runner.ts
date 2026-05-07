@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { resolveClashSpeedtestPath, type ResolveClashSpeedtestOptions } from "./clash-speedtest";
 import {
@@ -107,6 +107,16 @@ export function validateRunnableInputs(binaryPath: string, configPath: string) {
 export function validateBinaryInput(binaryPath: string) {
   if (!existsSync(binaryPath)) {
     throw new Error(`找不到 clash-speedtest 二进制：${binaryPath}`);
+  }
+
+  const normalizedPath = binaryPath.trim().toLowerCase();
+  if (normalizedPath.endsWith(".tar.gz") || normalizedPath.endsWith(".tgz") || normalizedPath.endsWith(".zip")) {
+    throw new Error("请选择解压后的 clash-speedtest 可执行文件，不要直接选择压缩包");
+  }
+
+  const stats = statSync(binaryPath);
+  if (!stats.isFile()) {
+    throw new Error(`请选择 clash-speedtest 可执行文件，当前不是文件：${binaryPath}`);
   }
 }
 

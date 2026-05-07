@@ -40,3 +40,28 @@ button,
 input {
   font: inherit;
 }
+
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(110, 231, 183, 0.38) rgba(28, 25, 23, 0.72);
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(28, 25, 23, 0.72);
+  border-radius: 9999px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(110, 231, 183, 0.5), rgba(16, 185, 129, 0.3));
+  border: 2px solid rgba(28, 25, 23, 0.82);
+  border-radius: 9999px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(167, 243, 208, 0.62), rgba(52, 211, 153, 0.44));
+}

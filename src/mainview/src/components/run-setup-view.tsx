@@ -1,4 +1,4 @@
-import { Check, FileSearch, Play } from "lucide-react";
+import { Check, FileSearch, Loader2, Play } from "lucide-react";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
@@ -37,6 +37,9 @@ export function RunSetupView({
   diagnosticsHint: string | null;
   onOpenDiagnostics: () => void;
 }) {
+  const isRunDisabled =
+    !configPath.trim() || !selectedRegionIds.length || isPending || state.clashSpeedtest.status === "downloading";
+
   return (
     <section className="mx-auto max-w-7xl px-8 pb-10">
       <div className="grid gap-6 lg:grid-cols-[1.3fr_.7fr]">
@@ -127,12 +130,9 @@ export function RunSetupView({
             ) : null}
 
             <div className="flex flex-wrap items-center gap-3">
-              <Button
-                onClick={onStartRun}
-                disabled={!configPath.trim() || !selectedRegionIds.length || isPending || state.clashSpeedtest.status === "downloading"}
-              >
-                <Play className="h-4 w-4" />
-                开始测试
+              <Button onClick={onStartRun} disabled={isRunDisabled} aria-busy={isPending}>
+                {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                {isPending ? "测试中..." : "开始测试"}
               </Button>
               <span className="text-sm text-stone-400">{progress}</span>
               {error ? <span className="text-sm text-red-300">{error}</span> : null}
@@ -146,7 +146,7 @@ export function RunSetupView({
             <CardDescription>这里只显示当前执行流程的实时进度，不再与结果分析区混排。</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="max-h-[460px] overflow-auto rounded-2xl border border-stone-800 bg-black/25 p-4 font-mono text-xs leading-6 text-stone-400">
+            <div className="custom-scrollbar max-h-[460px] overflow-auto rounded-2xl border border-stone-800 bg-black/25 p-4 font-mono text-xs leading-6 text-stone-400">
               {progressLog.map((message, index) => (
                 <div key={`${index}-${message}`}>{message}</div>
               ))}

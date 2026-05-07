@@ -190,6 +190,12 @@ describe("validateRunnableInputs", () => {
     );
   });
 
+  test("rejects archive files selected as clash-speedtest binaries", () => {
+    expect(() =>
+      validateRunnableInputs("/Users/nicholas/Downloads/clash-speedtest_Darwin_arm64.tar.gz", import.meta.path),
+    ).toThrow("请选择解压后的 clash-speedtest 可执行文件，不要直接选择压缩包");
+  });
+
   test("accepts pasted config paths with surrounding whitespace", () => {
     expect(() => validateRunnableInputs(import.meta.path, `  ${import.meta.path}  `)).not.toThrow();
   });
