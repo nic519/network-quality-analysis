@@ -33,6 +33,22 @@ describe("LatencyDatabase", () => {
     db.close();
   });
 
+  test("queries results for one run id", () => {
+    const db = new LatencyDatabase();
+    db.migrate();
+
+    db.saveRun(makeRun("run-1", "2026-05-07T10:00:00.000Z"));
+    db.saveRun(makeRun("run-2", "2026-05-07T10:05:00.000Z"));
+    db.saveResults([
+      makeResult("run-1", "hong-kong", "YouTube", "128ms"),
+      makeResult("run-2", "hong-kong", "YouTube", "328ms"),
+    ]);
+
+    expect(db.queryResults({ runId: "run-2" })).toEqual([makeResult("run-2", "hong-kong", "YouTube", "328ms")]);
+
+    db.close();
+  });
+
   test("stores recent config paths by latest successful run", () => {
     const db = new LatencyDatabase();
     db.migrate();
@@ -57,6 +73,17 @@ describe("LatencyDatabase", () => {
     db.close();
   });
 });
+
+function makeRun(id: string, startedAt: string): RunRecord {
+  return {
+    id,
+    startedAt,
+    completedAt: startedAt,
+    status: "completed",
+    selectedRegions: ["hong-kong"],
+    errorMessage: null,
+  };
+}
 
 function makeResult(
   runId: string,

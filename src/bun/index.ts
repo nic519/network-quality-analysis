@@ -76,7 +76,7 @@ const rpc = BrowserView.defineRPC<AppRPC>({
           db.saveConfigHistory(configPath, output.run.completedAt ?? output.run.startedAt);
           clashSpeedtestState = await getClashSpeedtestState();
           publishClashSpeedtestState(clashSpeedtestState);
-          return getAppState({ regionIds });
+          return getAppState({ runId: output.run.id, regionIds });
         } catch (error) {
           publishClashSpeedtestState(
             makeClashSpeedtestState({

@@ -230,6 +230,11 @@ export class LatencyDatabase {
     const clauses: string[] = [];
     const params: Record<string, string> = {};
 
+    if (filters.runId) {
+      clauses.push("results.run_id = $runId");
+      params.$runId = filters.runId;
+    }
+
     if (filters.regionIds?.length) {
       const placeholders = filters.regionIds.map((_, index) => `$region${index}`);
       clauses.push(`results.region_id IN (${placeholders.join(", ")})`);

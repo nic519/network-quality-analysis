@@ -8,18 +8,21 @@ export type ClashSpeedtestStatusHandler = (state: ClashSpeedtestState) => void;
 
 let progressHandler: ProgressHandler | null = null;
 let clashSpeedtestStatusHandler: ClashSpeedtestStatusHandler | null = null;
+const isElectrobun = "__electrobunBunBridge" in window;
 
-const rpc = Electroview.defineRPC<AppRPC>({
-  maxRequestTime: APP_RPC_TIMEOUT_MS,
-  handlers: {
-    messages: {
-      progress: ({ message }) => progressHandler?.(message),
-      clashSpeedtestStatus: (state) => clashSpeedtestStatusHandler?.(state),
-    },
-  },
-});
-
-const electroview = new Electroview({ rpc });
+export const api = isElectrobun
+  ? new Electroview({
+      rpc: Electroview.defineRPC<AppRPC>({
+        maxRequestTime: APP_RPC_TIMEOUT_MS,
+        handlers: {
+          messages: {
+            progress: ({ message }) => progressHandler?.(message),
+            clashSpeedtestStatus: (state) => clashSpeedtestStatusHandler?.(state),
+          },
+        },
+      }),
+    }).rpc!.request
+  : createPreviewApi();
 
 export function onProgress(handler: ProgressHandler) {
   progressHandler = handler;
@@ -34,10 +37,6 @@ export function onClashSpeedtestStatus(handler: ClashSpeedtestStatusHandler) {
     if (clashSpeedtestStatusHandler === handler) clashSpeedtestStatusHandler = null;
   };
 }
-
-const isElectrobun = "__electrobunBunBridge" in window;
-
-export const api = isElectrobun ? electroview.rpc!.request : createPreviewApi();
 
 function createPreviewApi() {
   const sample: AppState = {
@@ -62,28 +61,48 @@ function createPreviewApi() {
     runs: [
       {
         id: "preview-run",
-        startedAt: new Date().toISOString(),
-        completedAt: new Date().toISOString(),
+        startedAt: "2026-05-07T05:40:00.000Z",
+        completedAt: "2026-05-07T05:41:00.000Z",
+        status: "completed",
+        selectedRegions: ["hong-kong"],
+        errorMessage: null,
+      },
+      {
+        id: "preview-run-previous",
+        startedAt: "2026-05-07T05:20:00.000Z",
+        completedAt: "2026-05-07T05:21:00.000Z",
         status: "completed",
         selectedRegions: ["hong-kong"],
         errorMessage: null,
       },
     ],
     results: [
-      makePreviewResult("hong-kong", "香港", "HK-03", "Trojan", "YouTube", "128ms"),
-      makePreviewResult("hong-kong", "香港", "HK-03", "Trojan", "X", "152ms"),
-      makePreviewResult("hong-kong", "香港", "HK-03", "Trojan", "GitHub", "286ms"),
-      makePreviewResult("hong-kong", "香港", "HK-11", "Vmess", "YouTube", "312ms"),
-      makePreviewResult("hong-kong", "香港", "HK-11", "Vmess", "X", "N/A"),
-      makePreviewResult("hong-kong", "香港", "HK-11", "Vmess", "GitHub", "188ms"),
+      makePreviewResult("preview-run", "hong-kong", "香港", "HK-03", "Trojan", "YouTube", "128ms"),
+      makePreviewResult("preview-run", "hong-kong", "香港", "HK-03", "Trojan", "X", "152ms"),
+      makePreviewResult("preview-run", "hong-kong", "香港", "HK-03", "Trojan", "GitHub", "286ms"),
+      makePreviewResult("preview-run", "hong-kong", "香港", "HK-11", "Vmess", "YouTube", "312ms"),
+      makePreviewResult("preview-run", "hong-kong", "香港", "HK-11", "Vmess", "X", "N/A"),
+      makePreviewResult("preview-run", "hong-kong", "香港", "HK-11", "Vmess", "GitHub", "188ms"),
+      makePreviewResult("preview-run-previous", "hong-kong", "香港", "HK-03", "Trojan", "YouTube", "166ms"),
+      makePreviewResult("preview-run-previous", "hong-kong", "香港", "HK-03", "Trojan", "X", "190ms"),
+      makePreviewResult("preview-run-previous", "hong-kong", "香港", "HK-03", "Trojan", "GitHub", "340ms"),
     ],
   };
 
+  const getFilteredState = (filters: HistoryFilters = {}) => ({
+    ...sample,
+    results: sample.results.filter((row) => {
+      if (filters.runId && row.runId !== filters.runId) return false;
+      if (filters.regionIds?.length && !filters.regionIds.includes(row.regionId)) return false;
+      return true;
+    }),
+  });
+
   return {
-    getAppState: async (_filters: HistoryFilters) => sample,
+    getAppState: async (filters: HistoryFilters) => getFilteredState(filters),
     startRun: async (_params: StartRunParams) => {
       progressHandler?.("浏览器预览模式：真实测试会在 Electrobun 桌面应用内运行");
-      return sample;
+      return getFilteredState({ runId: sample.runs[0]?.id });
     },
     selectConfigFile: async ({ currentPath }: { currentPath?: string }) => {
       progressHandler?.("浏览器预览模式：系统文件选择器会在 Electrobun 桌面应用内打开");
@@ -97,6 +116,7 @@ function createPreviewApi() {
 }
 
 function makePreviewResult(
+  runId: string,
   regionId: "hong-kong" | "japan",
   regionLabel: string,
   proxyName: string,
@@ -105,7 +125,7 @@ function makePreviewResult(
   latency: string,
 ) {
   return {
-    runId: "preview-run",
+    runId,
     regionId,
     regionLabel,
     siteId: siteName.toLowerCase(),

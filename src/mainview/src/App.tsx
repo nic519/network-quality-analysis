@@ -15,24 +15,17 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { useEffect, useMemo, useState, useTransition } from "react";
+import { Bar, BarChart, CartesianGrid, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Badge } from "./components/ui/badge";
 import { Button } from "./components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/ui/card";
 import { Input } from "./components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./components/ui/table";
+import { buildLatencyChartRows, type MatrixRow } from "./lib/chart-data";
 import { api, onClashSpeedtestStatus, onProgress } from "./lib/electrobun";
 import { cn } from "./lib/utils";
 import { DEFAULT_SITES, REGION_PRESETS, latencyStatus, latencyToMs } from "../../shared/domain";
 import type { AppState } from "../../shared/rpc";
-
-type MatrixRow = {
-  key: string;
-  proxyId: string;
-  proxyName: string;
-  proxyType: string;
-  regionLabel: string;
-  values: Record<string, string>;
-};
 
 const today = new Date().toISOString().slice(0, 10);
 
@@ -55,9 +48,11 @@ export default function App() {
   });
   const [configPath, setConfigPath] = useState("");
   const [selectedRegionIds, setSelectedRegionIds] = useState<string[]>(["hong-kong"]);
+  const [selectedRunId, setSelectedRunId] = useState<string>("all");
   const [fromDate, setFromDate] = useState(today);
   const [toDate, setToDate] = useState(today);
   const [search, setSearch] = useState("");
+  const [selectedSiteId, setSelectedSiteId] = useState(DEFAULT_SITES[0]?.id ?? "");
   const [progress, setProgress] = useState("准备就绪");
   const [progressLog, setProgressLog] = useState<string[]>(["准备就绪"]);
   const [error, setError] = useState<string | null>(null);
@@ -65,11 +60,12 @@ export default function App() {
 
   const filters = useMemo(
     () => ({
+      runId: selectedRunId === "all" ? undefined : selectedRunId,
       regionIds: selectedRegionIds,
-      fromDate: `${fromDate}T00:00:00.000Z`,
-      toDate: `${toDate}T23:59:59.999Z`,
+      fromDate: selectedRunId === "all" ? `${fromDate}T00:00:00.000Z` : undefined,
+      toDate: selectedRunId === "all" ? `${toDate}T23:59:59.999Z` : undefined,
     }),
-    [fromDate, selectedRegionIds, toDate],
+    [fromDate, selectedRegionIds, selectedRunId, toDate],
   );
 
   useEffect(
@@ -101,7 +97,15 @@ export default function App() {
   }, [filters]);
 
   const matrixRows = useMemo(() => buildMatrixRows(state.results, search), [search, state.results]);
-  const summary = useMemo(() => summarize(state.results), [state.results]);
+  const selectedSite = DEFAULT_SITES.find((site) => site.id === selectedSiteId) ?? DEFAULT_SITES[0];
+  const latencyChartRows = useMemo(() => buildLatencyChartRows(matrixRows, selectedSite?.name), [matrixRows, selectedSite?.name]);
+  const availableChartRows = useMemo(() => latencyChartRows.filter((row) => row.isAvailable), [latencyChartRows]);
+  const unavailableChartRows = useMemo(() => latencyChartRows.filter((row) => !row.isAvailable), [latencyChartRows]);
+  const summaryResults = useMemo(
+    () => selectRunScopedResults(state.results, state.runs, selectedRunId),
+    [selectedRunId, state.results, state.runs],
+  );
+  const summary = useMemo(() => summarize(summaryResults), [summaryResults]);
   const latestRun = state.runs[0];
   const recentConfigPaths = state.configHistory.filter((item) => item.path !== configPath);
 
@@ -115,6 +119,7 @@ export default function App() {
         regionIds: selectedRegionIds as Array<"hong-kong" | "japan">,
       });
       setState(nextState);
+      setSelectedRunId(nextState.runs[0]?.id ?? "all");
       setProgress("测试完成");
       setProgressLog((current) => [...current.slice(-17), "测试完成"]);
     } catch (caught) {
@@ -239,6 +244,31 @@ export default function App() {
                   <Input type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} />
                 </label>
               </div>
+              <div className="space-y-2 lg:col-span-3">
+                <span className="text-sm font-medium text-stone-300">运行批次</span>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant={selectedRunId === "all" ? "default" : "outline"}
+                    className="h-9 px-3 text-xs"
+                    onClick={() => setSelectedRunId("all")}
+                  >
+                    全部运行
+                  </Button>
+                  {state.runs.slice(0, 8).map((run) => (
+                    <Button
+                      key={run.id}
+                      type="button"
+                      variant={selectedRunId === run.id ? "default" : "outline"}
+                      className="h-9 max-w-[260px] px-3 text-xs"
+                      title={run.id}
+                      onClick={() => setSelectedRunId(run.id)}
+                    >
+                      {formatRunOption(run)}
+                    </Button>
+                  ))}
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -246,7 +276,7 @@ export default function App() {
 
       <section className="mx-auto grid max-w-7xl gap-5 px-8 py-7 lg:grid-cols-4">
         <MetricCard icon={Gauge} label="最快延迟" value={summary.fastest} tone="emerald" />
-        <MetricCard icon={ShieldCheck} label="可用率" value={summary.availability} tone="amber" />
+        <MetricCard icon={ShieldCheck} label="本次可用率" value={summary.availability} tone="amber" />
         <MetricCard icon={Globe2} label="覆盖站点" value={`${summary.siteCount} 个`} tone="blue" />
         <MetricCard icon={CalendarDays} label="最近测试" value={latestRun ? formatDate(latestRun.startedAt) : "暂无"} tone="stone" />
       </section>
@@ -272,6 +302,110 @@ export default function App() {
             </div>
           </CardHeader>
           <CardContent className="p-0">
+            <div className="border-b border-stone-800 p-5">
+              <div className="mb-5 flex items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-base font-semibold text-stone-100">单站点延迟排行</h2>
+                  <p className="mt-1 text-sm text-stone-400">切换网站查看每个节点的直接测试结果，数值越短越适合优先尝试。</p>
+                </div>
+                <div className="flex flex-wrap justify-end gap-2">
+                  {DEFAULT_SITES.map((site) => (
+                    <Button
+                      key={site.id}
+                      type="button"
+                      variant={site.id === selectedSite?.id ? "default" : "outline"}
+                      className="h-8 px-3 text-xs"
+                      onClick={() => setSelectedSiteId(site.id)}
+                    >
+                      {site.name}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              <div className="h-[360px] w-full">
+                {availableChartRows.length ? (
+                  <ResponsiveContainer
+                    width="100%"
+                    height="100%"
+                    minWidth={0}
+                    minHeight={0}
+                    initialDimension={{ width: 800, height: 360 }}
+                  >
+                    <BarChart
+                      accessibilityLayer
+                      data={availableChartRows.slice(0, 12)}
+                      layout="vertical"
+                      margin={{ left: 8, right: 36, top: 6, bottom: 8 }}
+                    >
+                      <CartesianGrid horizontal={false} stroke="rgba(120, 113, 108, 0.22)" />
+                      <XAxis
+                        type="number"
+                        dataKey="latency"
+                        tickLine={false}
+                        axisLine={false}
+                        tickFormatter={(value) => `${value}ms`}
+                        tick={{ fill: "rgb(168 162 158)", fontSize: 12 }}
+                      />
+                      <YAxis
+                        type="category"
+                        dataKey="proxyName"
+                        tickLine={false}
+                        axisLine={false}
+                        tickMargin={10}
+                        width={150}
+                        tick={{ fill: "rgb(214 211 209)", fontSize: 12 }}
+                        tickFormatter={truncateChartLabel}
+                      />
+                      <Tooltip
+                        cursor={{ fill: "rgba(120, 113, 108, 0.12)" }}
+                        content={({ active, payload }) => {
+                          if (!active || !payload?.length) return null;
+                          const row = payload[0]?.payload as (typeof availableChartRows)[number];
+                          return (
+                            <div className="rounded-md border border-stone-700 bg-stone-950 px-3 py-2 text-sm shadow-xl">
+                              <div className="max-w-64 truncate font-medium text-stone-100">{row.proxyName}</div>
+                              <div className="mt-1 text-stone-400">{row.regionLabel} / {selectedSite?.name}</div>
+                              <div className="mt-1 font-semibold text-emerald-200">{row.latencyLabel}</div>
+                            </div>
+                          );
+                        }}
+                      />
+                      <Bar dataKey="latency" fill="hsl(var(--primary))" radius={[0, 6, 6, 0]} barSize={22}>
+                        <LabelList
+                          dataKey="latencyLabel"
+                          position="right"
+                          className="fill-stone-200 text-xs font-medium"
+                        />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex h-full items-center justify-center rounded-md border border-dashed border-stone-800 bg-black/20 text-sm text-stone-400">
+                    当前筛选下没有 {selectedSite?.name ?? "该网站"} 的可绘图延迟数据。
+                  </div>
+                )}
+              </div>
+              {unavailableChartRows.length ? (
+                <div className="mt-4 rounded-md border border-stone-800 bg-black/20 p-3">
+                  <div className="mb-2 text-xs font-semibold text-stone-300">
+                    {selectedSite?.name ?? "该网站"} 无可用延迟（{unavailableChartRows.length}）
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {unavailableChartRows.map((row) => (
+                      <Badge
+                        key={row.key}
+                        variant="outline"
+                        className="max-w-[260px] border-zinc-700 bg-zinc-900 text-zinc-300"
+                        title={`${row.proxyName} / ${row.regionLabel} / ${row.runId}`}
+                      >
+                        <span className="truncate">{row.proxyName}</span>
+                        <span className="ml-1 text-zinc-500">N/A</span>
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </div>
             <Table>
               <TableHeader>
                 <TableRow className="border-stone-800">
@@ -287,7 +421,9 @@ export default function App() {
                   <TableRow key={row.key} className="border-stone-900">
                     <TableCell>
                       <div className="font-medium text-stone-100">{row.proxyName}</div>
-                      <div className="text-xs text-stone-500">{row.proxyType}</div>
+                      <div className="text-xs text-stone-500">
+                        {row.proxyType} / {shortenId(row.runId)}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <Badge variant="secondary">{row.regionLabel}</Badge>
@@ -441,9 +577,10 @@ function buildMatrixRows(results: AppState["results"], search: string): MatrixRo
   for (const result of results) {
     if (normalizedSearch && !result.proxyName.toLowerCase().includes(normalizedSearch)) continue;
 
-    const key = `${result.regionId}:${result.proxyId}`;
+    const key = `${result.runId}:${result.regionId}:${result.proxyId}`;
     const row = rows.get(key) ?? {
       key,
+      runId: result.runId,
       proxyId: result.proxyId,
       proxyName: result.proxyName,
       proxyType: result.proxyType,
@@ -461,6 +598,11 @@ function buildMatrixRows(results: AppState["results"], search: string): MatrixRo
   });
 }
 
+function selectRunScopedResults(results: AppState["results"], _runs: AppState["runs"], selectedRunId: string) {
+  const runId = selectedRunId === "all" ? results[0]?.runId : selectedRunId;
+  return runId ? results.filter((row) => row.runId === runId) : results;
+}
+
 function summarize(results: AppState["results"]) {
   const latencies = results.map((row) => latencyToMs(row.latency)).filter((value): value is number => value !== null);
   const fastest = latencies.length ? `${Math.min(...latencies).toFixed(0)}ms` : "暂无";
@@ -468,6 +610,10 @@ function summarize(results: AppState["results"]) {
   const availability = results.length ? `${Math.round((available / results.length) * 100)}%` : "暂无";
   const siteCount = new Set(results.map((row) => row.siteId)).size;
   return { fastest, availability, siteCount };
+}
+
+function truncateChartLabel(value: string) {
+  return value.length > 18 ? `${value.slice(0, 18)}…` : value;
 }
 
 function bestLatency(values: Record<string, string>) {
@@ -482,6 +628,15 @@ function formatDate(value: string) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(value));
+}
+
+function formatRunOption(run: AppState["runs"][number]) {
+  const status = run.status === "completed" ? "完成" : run.status === "failed" ? "失败" : "运行中";
+  return `${formatDate(run.startedAt)} / ${status} / ${shortenId(run.id)}`;
+}
+
+function shortenId(id: string) {
+  return id.length > 18 ? id.slice(-18) : id;
 }
 
 function shortenPath(path: string) {

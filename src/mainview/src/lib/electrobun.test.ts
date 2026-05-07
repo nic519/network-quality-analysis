@@ -17,7 +17,7 @@ describe("webview RPC", () => {
 
     Object.defineProperty(globalThis, "window", {
       configurable: true,
-      value: {},
+      value: { __electrobunBunBridge: {} },
     });
 
     await import("./electrobun");

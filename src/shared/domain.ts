@@ -44,6 +44,7 @@ export type RunRecord = {
 };
 
 export type HistoryFilters = {
+  runId?: string;
   regionIds?: string[];
   fromDate?: string;
   toDate?: string;
