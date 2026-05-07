@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { chooseConfigFile } from "./file-dialog";
+import { chooseConfigFile, chooseExportDirectory } from "./file-dialog";
 
 describe("chooseConfigFile", () => {
   test("returns the selected config path", async () => {
@@ -37,5 +37,31 @@ describe("chooseConfigFile", () => {
     });
 
     expect(selected).toBe("/Users/nicholas/Library/Application Support/mihomo-party/profiles/19536a6d39f.yaml");
+  });
+});
+
+describe("chooseExportDirectory", () => {
+  test("returns the selected export folder", async () => {
+    const selected = await chooseExportDirectory({
+      openFileDialog: async (options) => {
+        expect(options).toMatchObject({
+          startingFolder: "~",
+          canChooseFiles: false,
+          canChooseDirectory: true,
+          allowsMultipleSelection: false,
+        });
+        return ["/Users/nicholas/Desktop/exports"];
+      },
+    });
+
+    expect(selected).toBe("/Users/nicholas/Desktop/exports");
+  });
+
+  test("returns null when export folder selection is cancelled", async () => {
+    const selected = await chooseExportDirectory({
+      openFileDialog: async () => [""],
+    });
+
+    expect(selected).toBeNull();
   });
 });

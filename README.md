@@ -11,7 +11,7 @@ Electrobun desktop app for testing website latency through `clash-speedtest`.
 - Downloads `clash-speedtest` from the `nic519/clash-speedtest` GitHub release on first use
 - Stores history in SQLite at `~/Library/Application Support/Latency Compass/latency-compass.sqlite`
 - Shows summary cards and a node-by-site latency matrix
-- Exports current filtered results as details and summary CSV files
+- Exports current filtered results as a summary CSV to a folder you choose
 
 ## Setup
 

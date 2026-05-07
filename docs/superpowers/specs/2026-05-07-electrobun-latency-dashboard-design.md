@@ -12,7 +12,7 @@ Rewrite this project as a desktop UI for testing website latency through `clash-
 - The UI presents results directly with cards, icons, status colors, and a node-by-site latency matrix.
 - SQLite stores run history and result rows.
 - Date and region filters query SQLite history.
-- CSV export remains available for current filtered results, generating detail and summary CSV files.
+- CSV export remains available for current filtered results, generating only the summary CSV into a user-selected folder.
 
 ## Out Of Scope
 
@@ -28,7 +28,7 @@ Rewrite this project as a desktop UI for testing website latency through `clash-
 - React renders the dashboard using shadcn/ui components and calls host RPC for data and test execution.
 - The host builds or uses a bundled `clash-speedtest` binary from `/Users/nicholas/Desktop/my_program/clash-speedtest`.
 - The host runs `clash-speedtest` in TSV mode per site and region preset, parses output, and stores normalized rows in SQLite.
-- CSV exports are generated from SQLite rows, not from UI state.
+- CSV summary exports are generated from SQLite rows, not from UI state.
 
 ## Data Model
 

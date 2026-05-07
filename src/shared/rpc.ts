@@ -28,7 +28,6 @@ export type StartRunParams = {
 };
 
 export type ExportCsvResponse = {
-  detailsPath: string;
   summaryPath: string;
 };
 
@@ -48,7 +47,7 @@ export type AppRPC = {
       getAppState: { params: HistoryFilters; response: AppState };
       selectConfigFile: { params: SelectConfigFileParams; response: string | null };
       startRun: { params: StartRunParams; response: AppState };
-      exportCsv: { params: HistoryFilters; response: ExportCsvResponse };
+      exportCsv: { params: HistoryFilters; response: ExportCsvResponse | null };
     };
     messages: {
       log: { message: string };

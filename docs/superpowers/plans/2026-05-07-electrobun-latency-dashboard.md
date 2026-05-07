@@ -64,9 +64,9 @@
 - Create: `src/bun/csv.ts`
 - Create: `src/bun/csv.test.ts`
 
-- [ ] Test details CSV includes one row per result.
+- [ ] Test CSV export only writes the summary file.
 - [ ] Test summary CSV pivots site latency columns by proxy.
-- [ ] Implement export writing into user-selected or app export directory.
+- [ ] Implement export writing into a user-selected directory.
 
 ### Task 6: Build Dashboard UI
 

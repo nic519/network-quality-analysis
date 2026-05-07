@@ -14,6 +14,10 @@ type ChooseConfigFileOptions = {
   openFileDialog: (options: OpenFileDialogOptions) => Promise<string[]>;
 };
 
+type ChooseExportDirectoryOptions = {
+  openFileDialog: (options: OpenFileDialogOptions) => Promise<string[]>;
+};
+
 export async function chooseConfigFile({
   currentPath,
   openFileDialog,
@@ -23,6 +27,18 @@ export async function chooseConfigFile({
     allowedFileTypes: "yaml,yml,json",
     canChooseFiles: true,
     canChooseDirectory: false,
+    allowsMultipleSelection: false,
+  });
+
+  const selectedPath = paths.map(normalizeSelectedPath).find((path) => path.length > 0);
+  return selectedPath ?? null;
+}
+
+export async function chooseExportDirectory({ openFileDialog }: ChooseExportDirectoryOptions) {
+  const paths = await openFileDialog({
+    startingFolder: "~",
+    canChooseFiles: false,
+    canChooseDirectory: true,
     allowsMultipleSelection: false,
   });
 

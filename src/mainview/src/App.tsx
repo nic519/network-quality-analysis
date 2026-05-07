@@ -132,7 +132,11 @@ export default function App() {
     setError(null);
     try {
       const exported = await api.exportCsv(filters);
-      setProgress(`已导出 CSV：${exported.detailsPath}`);
+      if (exported) {
+        setProgress(`已导出汇总 CSV：${exported.summaryPath}`);
+      } else {
+        setProgress("已取消导出");
+      }
     } catch (caught) {
       setError(toErrorMessage(caught));
     }

@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { ApplicationMenu, BrowserView, BrowserWindow, Utils } from "electrobun/bun";
 import { writeCsvExport } from "./csv";
 import { LatencyDatabase } from "./db";
-import { chooseConfigFile } from "./file-dialog";
+import { chooseConfigFile, chooseExportDirectory } from "./file-dialog";
 import { buildApplicationMenu } from "./menu";
 import { runLatencyTest } from "./runner";
 import { CLASH_SPEEDTEST_VERSION, getClashSpeedtestState, makeClashSpeedtestState } from "./clash-speedtest";
@@ -12,7 +12,6 @@ import { REGION_PRESETS, type HistoryFilters } from "../shared/domain";
 import { APP_RPC_TIMEOUT_MS, type AppRPC, type ClashSpeedtestState } from "../shared/rpc";
 
 const appDir = join(homedir(), "Library/Application Support/Latency Compass");
-const exportDir = join(appDir, "exports");
 mkdirSync(appDir, { recursive: true });
 
 const db = new LatencyDatabase(join(appDir, "latency-compass.sqlite"));
@@ -89,10 +88,12 @@ const rpc = BrowserView.defineRPC<AppRPC>({
           throw error;
         }
       },
-      exportCsv: (filters) => {
+      exportCsv: async (filters) => {
         const results = db.queryResults(filters);
+        const outputDir = await awaitExportDirectory();
+        if (!outputDir) return null;
         const stamp = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, "");
-        return writeCsvExport(results, exportDir, `latency-${stamp}`);
+        return writeCsvExport(results, outputDir, `latency-${stamp}`);
       },
     },
     messages: {
@@ -129,6 +130,10 @@ async function getAppState(filters: HistoryFilters = {}) {
 function publishClashSpeedtestState(state: ClashSpeedtestState) {
   clashSpeedtestState = state;
   window.webview.rpc?.send.clashSpeedtestStatus(state);
+}
+
+async function awaitExportDirectory() {
+  return chooseExportDirectory({ openFileDialog: Utils.openFileDialog });
 }
 
 function toErrorMessage(error: unknown) {

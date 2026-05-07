@@ -1,16 +1,19 @@
 import { describe, expect, test } from "bun:test";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { buildCsvExport } from "./csv";
+import { writeCsvExport } from "./csv";
 import type { ResultRow } from "../shared/domain";
 
 describe("buildCsvExport", () => {
-  test("exports detail rows and proxy-site summary", () => {
+  test("exports only proxy-site summary rows", () => {
     const exportData = buildCsvExport([
       makeResult("YouTube", "128ms"),
       makeResult("GitHub", "188ms"),
     ]);
 
-    expect(exportData.details).toContain("run_id,region,site,site_url,sequence,proxy_id,proxy_name");
-    expect(exportData.details).toContain("run-1,香港,YouTube,https://youtube.example.com,1.,stable-proxy-id,HK-01,Trojan,128ms");
+    expect(exportData).not.toHaveProperty("details");
     expect(exportData.summary).toBe(
       [
         "run_id,region,proxy_id,proxy_name,proxy_type,YouTube,GitHub",
@@ -18,6 +21,20 @@ describe("buildCsvExport", () => {
         "",
       ].join("\n"),
     );
+  });
+
+  test("writes only the summary CSV file", () => {
+    const outputDir = mkdtempSync(join(tmpdir(), "latency-csv-"));
+
+    try {
+      const exported = writeCsvExport([makeResult("YouTube", "128ms")], outputDir, "latency-test");
+
+      expect(exported).toEqual({ summaryPath: join(outputDir, "latency-test-summary.csv") });
+      expect(existsSync(join(outputDir, "latency-test-summary.csv"))).toBe(true);
+      expect(existsSync(join(outputDir, "latency-test-details.csv"))).toBe(false);
+    } finally {
+      rmSync(outputDir, { recursive: true, force: true });
+    }
   });
 });
 

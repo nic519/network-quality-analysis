@@ -109,8 +109,7 @@ function createPreviewApi() {
       return currentPath?.trim() ? currentPath : null;
     },
     exportCsv: async (_filters: HistoryFilters): Promise<ExportCsvResponse> => ({
-      detailsPath: "~/Library/Application Support/Latency Compass/exports/preview-details.csv",
-      summaryPath: "~/Library/Application Support/Latency Compass/exports/preview-summary.csv",
+      summaryPath: "~/Desktop/latency-preview-summary.csv",
     }),
   };
 }
