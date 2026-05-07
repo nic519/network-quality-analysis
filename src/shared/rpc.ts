@@ -17,10 +17,15 @@ export type ExportCsvResponse = {
   summaryPath: string;
 };
 
+export type SelectConfigFileParams = {
+  currentPath?: string;
+};
+
 export type AppRPC = {
   bun: RPCSchema<{
     requests: {
       getAppState: { params: HistoryFilters; response: AppState };
+      selectConfigFile: { params: SelectConfigFileParams; response: string | null };
       startRun: { params: StartRunParams; response: AppState };
       exportCsv: { params: HistoryFilters; response: ExportCsvResponse };
     };

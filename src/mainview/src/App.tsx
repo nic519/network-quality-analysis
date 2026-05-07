@@ -1,4 +1,4 @@
-import { Activity, CalendarDays, Download, Gauge, Globe2, Play, Radar, Search, ShieldCheck } from "lucide-react";
+import { Activity, CalendarDays, Download, FileSearch, Gauge, Globe2, Play, Radar, Search, ShieldCheck } from "lucide-react";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { Badge } from "./components/ui/badge";
 import { Button } from "./components/ui/button";
@@ -87,6 +87,19 @@ export default function App() {
     }
   }
 
+  async function selectConfigFile() {
+    setError(null);
+    try {
+      const selectedPath = await api.selectConfigFile({ currentPath: configPath });
+      if (selectedPath) {
+        setConfigPath(selectedPath);
+        setProgress("已选择配置文件");
+      }
+    } catch (caught) {
+      setError(toErrorMessage(caught));
+    }
+  }
+
   return (
     <main className="min-h-screen overflow-hidden bg-background text-foreground">
       <section className="relative border-b border-white/10 px-8 py-8">
@@ -121,11 +134,17 @@ export default function App() {
             <CardContent className="grid gap-4 p-5 lg:grid-cols-[1.4fr_.9fr_.9fr]">
               <label className="space-y-2">
                 <span className="text-sm font-medium text-stone-300">Clash/Mihomo 配置路径或订阅 URL</span>
-                <Input
-                  value={configPath}
-                  onChange={(event) => setConfigPath(event.target.value)}
-                  placeholder="/Users/nicholas/Library/Application Support/mihomo-party/profiles/config.yaml"
-                />
+                <div className="flex gap-2">
+                  <Input
+                    value={configPath}
+                    onChange={(event) => setConfigPath(event.target.value)}
+                    placeholder="/Users/nicholas/Library/Application Support/mihomo-party/profiles/config.yaml"
+                  />
+                  <Button type="button" variant="outline" onClick={selectConfigFile} className="shrink-0">
+                    <FileSearch className="h-4 w-4" />
+                    选择文件
+                  </Button>
+                </div>
               </label>
               <div className="space-y-2">
                 <span className="text-sm font-medium text-stone-300">地区预设</span>

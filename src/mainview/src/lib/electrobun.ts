@@ -57,6 +57,10 @@ function createPreviewApi() {
       progressHandler?.("浏览器预览模式：真实测试会在 Electrobun 桌面应用内运行");
       return sample;
     },
+    selectConfigFile: async ({ currentPath }: { currentPath?: string }) => {
+      progressHandler?.("浏览器预览模式：系统文件选择器会在 Electrobun 桌面应用内打开");
+      return currentPath?.trim() ? currentPath : null;
+    },
     exportCsv: async (_filters: HistoryFilters): Promise<ExportCsvResponse> => ({
       detailsPath: "~/Library/Application Support/Latency Compass/exports/preview-details.csv",
       summaryPath: "~/Library/Application Support/Latency Compass/exports/preview-summary.csv",

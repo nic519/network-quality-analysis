@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { BrowserView, BrowserWindow } from "electrobun/bun";
 import { writeCsvExport } from "./csv";
 import { LatencyDatabase } from "./db";
+import { chooseConfigFile } from "./file-dialog";
 import { runLatencyTest } from "./runner";
 import { REGION_PRESETS, type HistoryFilters } from "../shared/domain";
 import type { AppRPC } from "../shared/rpc";
@@ -20,6 +21,7 @@ const rpc = BrowserView.defineRPC<AppRPC>({
   handlers: {
     requests: {
       getAppState: (filters) => getAppState(filters),
+      selectConfigFile: ({ currentPath }) => chooseConfigFile({ currentPath }),
       startRun: async ({ configPath, regionIds }) => {
         const output = await runLatencyTest(
           { configPath, regionIds },
