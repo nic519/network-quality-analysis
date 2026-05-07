@@ -14,6 +14,7 @@ export type LatencyChartRow = {
   key: string;
   runId: string;
   proxyName: string;
+  proxyType: string;
   regionLabel: string;
   latency: number | null;
   latencyLabel: string;
@@ -31,6 +32,7 @@ export function buildLatencyChartRows(rows: MatrixRow[], siteName: string | unde
         key: row.key,
         runId: row.runId,
         proxyName: row.proxyName,
+        proxyType: row.proxyType,
         regionLabel: row.regionLabel,
         latency,
         latencyLabel,
