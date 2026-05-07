@@ -1,15 +1,13 @@
-import { chmodSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { mkdtemp, rename, rm } from "node:fs/promises";
-import { homedir, tmpdir } from "node:os";
+import { existsSync } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import type { ClashSpeedtestState } from "../shared/rpc";
 
 export const CLASH_SPEEDTEST_VERSION = "v0.0.1";
-const RELEASE_BASE_URL = `https://github.com/nic519/clash-speedtest/releases/download/${CLASH_SPEEDTEST_VERSION}`;
 const RELEASE_API_URL = "https://api.github.com/repos/nic519/clash-speedtest/releases/latest";
-const RELEASE_DOWNLOAD_TIMEOUT_MS = 120_000;
 const RELEASE_CHECK_TIMEOUT_MS = 10_000;
 const RELEASE_CHECK_CACHE_MS = 10 * 60 * 1000;
+const GO_INSTALL_COMMAND = "go install github.com/nic519/clash-speedtest@latest";
 
 export type ClashSpeedtestAsset = {
   archiveName: string;
@@ -20,13 +18,15 @@ export type ClashSpeedtestAsset = {
 export type ResolveClashSpeedtestOptions = {
   platform?: NodeJS.Platform;
   arch?: NodeJS.Architecture;
-  installRoot?: string;
   envPath?: string;
-  fetchArchive?: (url: string) => Promise<ArrayBuffer>;
-  onProgress?: (message: string) => void;
+  gobin?: string;
+  goPath?: string;
 };
 
-export type ClashSpeedtestStatusOptions = Pick<ResolveClashSpeedtestOptions, "platform" | "arch" | "installRoot" | "envPath"> & {
+export type ClashSpeedtestStatusOptions = Pick<
+  ResolveClashSpeedtestOptions,
+  "platform" | "arch" | "envPath" | "gobin" | "goPath"
+> & {
   now?: () => Date;
   fetchLatestVersion?: () => Promise<string | null>;
 };
@@ -39,25 +39,11 @@ type LocalClashSpeedtestInstall = {
 let latestVersionCache: { checkedAt: number; version: string | null } | null = null;
 
 export async function resolveClashSpeedtestPath(options: ResolveClashSpeedtestOptions = {}) {
-  if (options.envPath && existsSync(options.envPath)) return options.envPath;
-  if (process.env.CLASH_SPEEDTEST_PATH && existsSync(process.env.CLASH_SPEEDTEST_PATH)) {
-    return process.env.CLASH_SPEEDTEST_PATH;
-  }
-
-  const platform = options.platform ?? process.platform;
-  const asset = getClashSpeedtestAsset(platform, options.arch ?? process.arch);
-  const installDir = getClashSpeedtestInstallDir(options.installRoot);
-  const executablePath = join(installDir, asset.executableName);
-  if (existsSync(executablePath)) return executablePath;
-
-  options.onProgress?.(`下载 clash-speedtest ${CLASH_SPEEDTEST_VERSION}`);
-  await downloadAndInstallClashSpeedtest(asset, installDir, {
-    fetchArchive: options.fetchArchive,
-    platform,
-  });
-  options.onProgress?.("clash-speedtest 准备完成");
-
-  return executablePath;
+  const local = getLocalClashSpeedtestInstall(options);
+  if (local.path) return local.path;
+  throw new Error(
+    `未找到 clash-speedtest 可执行文件。请先运行 \`${GO_INSTALL_COMMAND}\`，或在“依赖”页手动指定一个本地可执行文件路径。`,
+  );
 }
 
 export async function getClashSpeedtestState(options: ClashSpeedtestStatusOptions = {}): Promise<ClashSpeedtestState> {
@@ -65,6 +51,7 @@ export async function getClashSpeedtestState(options: ClashSpeedtestStatusOption
   const local = getLocalClashSpeedtestInstall(options);
   const base = makeClashSpeedtestState({
     status: local.path ? "ready" : "missing",
+    version: local.path ? CLASH_SPEEDTEST_VERSION : null,
     path: local.path,
     source: local.source,
     latestVersion: null,
@@ -100,32 +87,42 @@ export function getLocalClashSpeedtestInstall(options: ClashSpeedtestStatusOptio
     return { path: process.env.CLASH_SPEEDTEST_PATH, source: "environment" };
   }
 
-  const platform = options.platform ?? process.platform;
-  const asset = getClashSpeedtestAsset(platform, options.arch ?? process.arch);
-  const executablePath = join(getClashSpeedtestInstallDir(options.installRoot), asset.executableName);
-  return existsSync(executablePath) ? { path: executablePath, source: "cache" } : { path: null, source: null };
+  const executableName = getExecutableName(options.platform ?? process.platform);
+  const gobin = options.gobin ?? process.env.GOBIN ?? null;
+  const goPath = options.goPath ?? process.env.GOPATH ?? getDefaultGoPath();
+  const hasExplicitGoPaths = options.gobin !== undefined || options.goPath !== undefined;
+  const candidates = [
+    gobin ? join(gobin, executableName) : null,
+    goPath ? join(goPath, "bin", executableName) : null,
+    !hasExplicitGoPaths ? join(homedir(), "go", "bin", executableName) : null,
+  ].filter((value): value is string => Boolean(value));
+
+  const installedPath = candidates.find((candidate) => existsSync(candidate));
+  return installedPath ? { path: installedPath, source: "go-install" } : { path: null, source: null };
 }
 
 export function makeClashSpeedtestState(
   input: Partial<ClashSpeedtestState> & Pick<ClashSpeedtestState, "status" | "checkedAt">,
 ): ClashSpeedtestState {
-  const updateAvailable =
-    input.updateAvailable ?? (input.latestVersion ? isNewerVersion(input.latestVersion, CLASH_SPEEDTEST_VERSION) : null);
+  const version = input.version ?? (input.path ? CLASH_SPEEDTEST_VERSION : null);
+  const updateAvailable = input.updateAvailable ?? (input.latestVersion ? isNewerVersion(input.latestVersion, CLASH_SPEEDTEST_VERSION) : null);
   const updateCheckStatus = input.updateCheckStatus ?? "idle";
   const updateCheckMessage = input.updateCheckMessage ?? null;
   const path = input.path ?? null;
   const source = input.source ?? null;
-  const message = input.message ?? describeClashSpeedtestState(input.status, {
-    latestVersion: input.latestVersion ?? null,
-    path,
-    updateAvailable,
-    updateCheckStatus,
-    updateCheckMessage,
-  });
+  const message =
+    input.message ??
+    describeClashSpeedtestState(input.status, {
+      latestVersion: input.latestVersion ?? null,
+      path,
+      updateAvailable,
+      updateCheckStatus,
+      updateCheckMessage,
+    });
 
   return {
     status: input.status,
-    version: CLASH_SPEEDTEST_VERSION,
+    version,
     latestVersion: input.latestVersion ?? null,
     updateAvailable,
     updateCheckStatus,
@@ -146,13 +143,9 @@ export function getClashSpeedtestAsset(platform: NodeJS.Platform, arch: NodeJS.A
 
   return {
     archiveName,
-    archiveUrl: `${RELEASE_BASE_URL}/${archiveName}`,
+    archiveUrl: `https://github.com/nic519/clash-speedtest/releases/download/${CLASH_SPEEDTEST_VERSION}/${archiveName}`,
     executableName,
   };
-}
-
-export function getClashSpeedtestInstallDir(installRoot = getDefaultInstallRoot()) {
-  return join(installRoot, "clash-speedtest", CLASH_SPEEDTEST_VERSION);
 }
 
 async function getLatestClashSpeedtestVersion(options: {
@@ -186,78 +179,8 @@ async function fetchLatestReleaseVersion() {
   return typeof payload.tag_name === "string" && payload.tag_name.trim() ? payload.tag_name.trim() : null;
 }
 
-async function downloadAndInstallClashSpeedtest(
-  asset: ClashSpeedtestAsset,
-  installDir: string,
-  options: {
-    fetchArchive?: (url: string) => Promise<ArrayBuffer>;
-    platform: NodeJS.Platform;
-  },
-) {
-  const tempDir = await mkdtemp(join(tmpdir(), "latency-compass-clash-speedtest-"));
-  const archivePath = join(tempDir, asset.archiveName);
-
-  try {
-    const archive = await (options.fetchArchive ?? fetchReleaseAsset)(asset.archiveUrl);
-    writeFileSync(archivePath, new Uint8Array(archive));
-    await extractArchive(archivePath, tempDir, options.platform);
-
-    const extractedPath = join(tempDir, asset.executableName);
-    if (!existsSync(extractedPath)) {
-      throw new Error(`下载包中缺少 ${asset.executableName}: ${asset.archiveName}`);
-    }
-
-    rmSync(installDir, { recursive: true, force: true });
-    mkdirSync(installDir, { recursive: true });
-    await rename(extractedPath, join(installDir, asset.executableName));
-    if (options.platform !== "win32") chmodSync(join(installDir, asset.executableName), 0o755);
-  } finally {
-    await rm(tempDir, { recursive: true, force: true });
-  }
-}
-
-async function fetchReleaseAsset(url: string) {
-  const response = await fetch(url, {
-    headers: {
-      "User-Agent": "Latency Compass",
-    },
-    signal: AbortSignal.timeout(RELEASE_DOWNLOAD_TIMEOUT_MS),
-  });
-
-  if (!response.ok) {
-    throw new Error(`下载 clash-speedtest 失败：${response.status} ${response.statusText}`);
-  }
-
-  return response.arrayBuffer();
-}
-
-async function extractArchive(archivePath: string, destination: string, platform: NodeJS.Platform) {
-  const command =
-    platform === "win32"
-      ? [
-          "powershell",
-          "-NoProfile",
-          "-Command",
-          "Expand-Archive -LiteralPath $args[0] -DestinationPath $args[1] -Force",
-          archivePath,
-          destination,
-        ]
-      : ["tar", "-xzf", archivePath, "-C", destination];
-
-  const proc = Bun.spawn(command, {
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-    proc.exited,
-  ]);
-
-  if (exitCode !== 0) {
-    const output = [stdout, stderr].filter(Boolean).join("\n").trim();
-    throw new Error(`解压 clash-speedtest 失败：${output}`);
-  }
+function getExecutableName(platform: NodeJS.Platform) {
+  return platform === "win32" ? "clash-speedtest.exe" : "clash-speedtest";
 }
 
 function getReleaseOsName(platform: NodeJS.Platform) {
@@ -283,23 +206,23 @@ function describeClashSpeedtestState(
     updateCheckMessage: string | null;
   },
 ) {
-  if (status === "downloading") return `正在下载 clash-speedtest ${CLASH_SPEEDTEST_VERSION}`;
-  if (status === "checking-update") return "正在检查 clash-speedtest 更新";
-  if (status === "error") return "clash-speedtest 状态检查失败";
+  if (status === "downloading") return "正在准备 clash-speedtest";
+  if (status === "checking-update") return "正在检查 clash-speedtest 状态";
+  if (status === "error") return "clash-speedtest 当前不可用";
   if (!details.path) {
     if (details.updateCheckStatus === "failed" && details.updateCheckMessage) {
-      return `clash-speedtest 未下载，更新检查失败：${details.updateCheckMessage}`;
+      return `尚未检测到 clash-speedtest，本地安装检查正常，但远端版本检查失败：${details.updateCheckMessage}`;
     }
-    return `clash-speedtest 未下载，首次测试会自动下载 ${CLASH_SPEEDTEST_VERSION}`;
+    return `尚未检测到 clash-speedtest。请先运行 \`${GO_INSTALL_COMMAND}\``;
   }
   if (details.updateCheckStatus === "failed" && details.updateCheckMessage) {
-    return `clash-speedtest 已就绪，检查更新失败：${details.updateCheckMessage}`;
+    return `已检测到 clash-speedtest，但远端版本检查失败：${details.updateCheckMessage}`;
   }
   if (details.updateAvailable) {
-    return `clash-speedtest 已就绪，GitHub 有新版本 ${details.latestVersion}`;
+    return `已检测到 clash-speedtest，GitHub 有新版本 ${details.latestVersion}`;
   }
-  if (details.updateAvailable === false) return `clash-speedtest 已就绪，当前为最新版本 ${CLASH_SPEEDTEST_VERSION}`;
-  return `clash-speedtest 已就绪，当前版本 ${CLASH_SPEEDTEST_VERSION}`;
+  if (details.updateAvailable === false) return `已检测到 clash-speedtest，当前最新版本为 ${CLASH_SPEEDTEST_VERSION}`;
+  return "已检测到 clash-speedtest，可直接运行";
 }
 
 function isNewerVersion(candidate: string, current: string) {
@@ -325,9 +248,6 @@ function toErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
-function getDefaultInstallRoot() {
-  if (process.platform === "darwin") {
-    return join(homedir(), "Library/Application Support/Latency Compass/bin");
-  }
-  return join(homedir(), ".latency-compass/bin");
+function getDefaultGoPath() {
+  return join(homedir(), "go");
 }

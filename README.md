@@ -8,7 +8,7 @@ Electrobun desktop app for testing website latency through `clash-speedtest`.
 - Electrobun desktop shell
 - Built-in region presets: Hong Kong and Japan
 - Built-in sites: YouTube, X, GitHub
-- Downloads `clash-speedtest` from the `nic519/clash-speedtest` GitHub release on first use
+- Guides users to install `clash-speedtest` with `go install github.com/nic519/clash-speedtest@latest`
 - Stores history in SQLite at `~/Library/Application Support/Latency Compass/latency-compass.sqlite`
 - Shows summary cards and a node-by-site latency matrix
 - Exports current filtered results as a summary CSV to a folder you choose
@@ -17,6 +17,12 @@ Electrobun desktop app for testing website latency through `clash-speedtest`.
 
 ```bash
 bun install
+```
+
+Install `clash-speedtest` separately before running tests in the app:
+
+```bash
+go install github.com/nic519/clash-speedtest@latest
 ```
 
 ## Development
@@ -32,5 +38,5 @@ The app expects a local Clash/Mihomo config path or subscription URL in the UI.
 Filters are not user-authored in the first version; selecting `香港` or `日本`
 uses the region regexes defined in `src/shared/domain.ts`.
 
-For local Go development, set `CLASH_SPEEDTEST_PATH` to a locally built binary
-before starting the app.
+For local development and debugging, you can still set `CLASH_SPEEDTEST_PATH`
+or manually specify a binary path in the diagnostics view.

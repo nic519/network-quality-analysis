@@ -1,7 +1,14 @@
 import { Electroview } from "electrobun/view";
 import { REGION_PRESETS, type HistoryFilters } from "../../../shared/domain";
 import { APP_RPC_TIMEOUT_MS, type AppRPC } from "../../../shared/rpc";
-import type { AppState, ClashSpeedtestState, ExportCsvResponse, StartRunParams } from "../../../shared/rpc";
+import type {
+  AppState,
+  ClashSpeedtestState,
+  ExportCsvResponse,
+  ResetClashSpeedtestBinaryPathResponse,
+  SetClashSpeedtestBinaryPathParams,
+  StartRunParams,
+} from "../../../shared/rpc";
 
 export type ProgressHandler = (message: string) => void;
 export type ClashSpeedtestStatusHandler = (state: ClashSpeedtestState) => void;
@@ -55,9 +62,9 @@ function createPreviewApi() {
       updateAvailable: false,
       updateCheckStatus: "ok",
       updateCheckMessage: null,
-      path: "~/Library/Application Support/Latency Compass/bin/clash-speedtest/v0.0.1/clash-speedtest",
-      source: "cache",
-      message: "clash-speedtest 已就绪，当前为最新版本 v0.0.1",
+      path: "~/go/bin/clash-speedtest",
+      source: "go-install",
+      message: "已检测到 clash-speedtest，当前最新版本为 v0.0.1",
       checkedAt: new Date().toISOString(),
     },
     runs: [
@@ -113,6 +120,14 @@ function createPreviewApi() {
     selectClashSpeedtestBinary: async ({ currentPath }: { currentPath?: string | null }) => {
       progressHandler?.("浏览器预览模式：请在桌面应用中选择 clash-speedtest 二进制");
       return currentPath?.trim() ? currentPath : "/Users/nicholas/Downloads/clash-speedtest";
+    },
+    setClashSpeedtestBinaryPath: async ({ path }: SetClashSpeedtestBinaryPathParams) => {
+      progressHandler?.(`浏览器预览模式：已指定 clash-speedtest 路径 ${path}`);
+      return path.trim() || null;
+    },
+    resetClashSpeedtestBinaryPath: async (): Promise<ResetClashSpeedtestBinaryPathResponse> => {
+      progressHandler?.("浏览器预览模式：已切换回系统命令依赖");
+      return { cleared: true };
     },
     openExternalUrl: async ({ url }: { url: string }) => {
       window.open(url, "_blank", "noopener,noreferrer");

@@ -91,13 +91,13 @@ describe("runLatencyTest", () => {
     expect(output.results).toHaveLength(1);
   });
 
-  test("resolves clash-speedtest from the release cache when no binary path is provided", async () => {
-    const root = join(tmpdir(), `latency-runner-cache-${Date.now()}`);
-    const installDir = join(root, "clash-speedtest/v0.0.1");
-    const binaryPath = join(installDir, "clash-speedtest");
+  test("resolves clash-speedtest from a go install location when no binary path is provided", async () => {
+    const root = join(tmpdir(), `latency-runner-gobin-${Date.now()}`);
+    const binaryPath = join(root, "clash-speedtest");
     const configPath = join(root, "config.yaml");
-    mkdirSync(installDir, { recursive: true });
+    mkdirSync(root, { recursive: true });
     writeFileSync(binaryPath, "");
+    chmodSync(binaryPath, 0o755);
     writeFileSync(configPath, "");
     const binaries: string[] = [];
 
@@ -108,7 +108,7 @@ describe("runLatencyTest", () => {
       },
       {
         binaryResolverOptions: {
-          installRoot: root,
+          gobin: root,
           platform: "darwin",
           arch: "arm64",
         },

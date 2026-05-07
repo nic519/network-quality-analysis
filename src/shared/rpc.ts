@@ -13,13 +13,13 @@ export type AppState = {
 
 export type ClashSpeedtestState = {
   status: "missing" | "ready" | "downloading" | "checking-update" | "error";
-  version: string;
+  version: string | null;
   latestVersion: string | null;
   updateAvailable: boolean | null;
   updateCheckStatus: "idle" | "ok" | "failed";
   updateCheckMessage: string | null;
   path: string | null;
-  source: "environment" | "cache" | "manual" | null;
+  source: "environment" | "go-install" | "manual" | null;
   message: string;
   checkedAt: string;
 };
@@ -45,6 +45,14 @@ export type SelectClashSpeedtestBinaryParams = {
   currentPath?: string | null;
 };
 
+export type SetClashSpeedtestBinaryPathParams = {
+  path: string;
+};
+
+export type ResetClashSpeedtestBinaryPathResponse = {
+  cleared: boolean;
+};
+
 export type ConfigHistoryItem = {
   path: string;
   lastUsedAt: string;
@@ -57,6 +65,8 @@ export type AppRPC = {
       getAppState: { params: HistoryFilters; response: AppState };
       selectConfigFile: { params: SelectConfigFileParams; response: string | null };
       selectClashSpeedtestBinary: { params: SelectClashSpeedtestBinaryParams; response: string | null };
+      setClashSpeedtestBinaryPath: { params: SetClashSpeedtestBinaryPathParams; response: string | null };
+      resetClashSpeedtestBinaryPath: { params: undefined; response: ResetClashSpeedtestBinaryPathResponse };
       openExternalUrl: { params: OpenExternalUrlParams; response: null };
       startRun: { params: StartRunParams; response: AppState };
       exportCsv: { params: HistoryFilters; response: ExportCsvResponse | null };

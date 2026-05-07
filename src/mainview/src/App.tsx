@@ -18,14 +18,14 @@ export default function App() {
     results: [],
     clashSpeedtest: {
       status: "checking-update",
-      version: "v0.0.1",
+      version: null,
       latestVersion: null,
       updateAvailable: null,
       updateCheckStatus: "idle",
       updateCheckMessage: null,
       path: null,
       source: null,
-      message: "正在检查 clash-speedtest 更新",
+      message: "正在检查 clash-speedtest 状态",
       checkedAt: new Date().toISOString(),
     },
   });
@@ -155,12 +155,25 @@ export default function App() {
     }
   }
 
-  async function openReleasePage() {
+  async function setClashSpeedtestBinaryPath(path: string) {
     setError(null);
     try {
-      await api.openExternalUrl({
-        url: "https://github.com/nic519/clash-speedtest/releases/tag/v0.0.1",
-      });
+      const selectedPath = await api.setClashSpeedtestBinaryPath({ path });
+      if (selectedPath) {
+        setProgress(`已指定 clash-speedtest 路径：${selectedPath}`);
+        setState(await api.getAppState(filters));
+      }
+    } catch (caught) {
+      setError(toErrorMessage(caught));
+    }
+  }
+
+  async function resetClashSpeedtestBinaryPath() {
+    setError(null);
+    try {
+      await api.resetClashSpeedtestBinaryPath();
+      setProgress("已切换为系统命令依赖");
+      setState(await api.getAppState(filters));
     } catch (caught) {
       setError(toErrorMessage(caught));
     }
@@ -219,9 +232,9 @@ export default function App() {
       {activeView === "diagnostics" ? (
         <DiagnosticsView
           state={state.clashSpeedtest}
-          onOpenRunView={() => setActiveView("run")}
           onSelectBinary={selectClashSpeedtestBinary}
-          onOpenReleasePage={openReleasePage}
+          onSetBinaryPath={setClashSpeedtestBinaryPath}
+          onResetBinaryPath={resetClashSpeedtestBinaryPath}
         />
       ) : null}
     </main>

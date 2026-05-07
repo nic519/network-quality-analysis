@@ -1,11 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
   CLASH_SPEEDTEST_VERSION,
   getClashSpeedtestAsset,
-  getClashSpeedtestInstallDir,
   getClashSpeedtestState,
   resolveClashSpeedtestPath,
 } from "./clash-speedtest";
@@ -38,33 +37,42 @@ describe("resolveClashSpeedtestPath", () => {
     await expect(resolveClashSpeedtestPath({ envPath: binaryPath })).resolves.toBe(binaryPath);
   });
 
-  test("uses the versioned install cache before downloading", async () => {
-    const root = join(tmpdir(), `latency-compass-cache-${Date.now()}`);
-    const installDir = getClashSpeedtestInstallDir(root);
-    const binaryPath = join(installDir, "clash-speedtest");
-    mkdirSync(installDir, { recursive: true });
+  test("uses the go install binary under GOBIN before falling back", async () => {
+    const root = join(tmpdir(), `latency-compass-gobin-${Date.now()}`);
+    const binaryPath = join(root, "clash-speedtest");
+    mkdirSync(root, { recursive: true });
     writeFileSync(binaryPath, "");
+    chmodSync(binaryPath, 0o755);
 
     await expect(
       resolveClashSpeedtestPath({
-        installRoot: root,
+        gobin: root,
         platform: "darwin",
         arch: "arm64",
-        fetchArchive: async () => {
-          throw new Error("should not download");
-        },
       }),
     ).resolves.toBe(binaryPath);
+  });
+
+  test("fails with installation guidance when no binary is available", async () => {
+    const root = join(tmpdir(), `latency-compass-missing-bin-${Date.now()}`);
+
+    await expect(
+      resolveClashSpeedtestPath({
+        gobin: root,
+        goPath: root,
+      }),
+    ).rejects.toThrow("go install github.com/nic519/clash-speedtest@latest");
   });
 });
 
 describe("getClashSpeedtestState", () => {
-  test("reports missing installs before first download", async () => {
+  test("reports missing installs with go install guidance", async () => {
     const root = join(tmpdir(), `latency-compass-missing-${Date.now()}`);
 
     await expect(
       getClashSpeedtestState({
-        installRoot: root,
+        gobin: root,
+        goPath: root,
         platform: "darwin",
         arch: "arm64",
         fetchLatestVersion: async () => CLASH_SPEEDTEST_VERSION,
@@ -81,16 +89,16 @@ describe("getClashSpeedtestState", () => {
     });
   });
 
-  test("reports cached installs as ready", async () => {
+  test("reports go install binaries as ready", async () => {
     const root = join(tmpdir(), `latency-compass-ready-${Date.now()}`);
-    const installDir = getClashSpeedtestInstallDir(root);
-    const binaryPath = join(installDir, "clash-speedtest");
-    mkdirSync(installDir, { recursive: true });
+    const binaryPath = join(root, "clash-speedtest");
+    mkdirSync(root, { recursive: true });
     writeFileSync(binaryPath, "");
+    chmodSync(binaryPath, 0o755);
 
     await expect(
       getClashSpeedtestState({
-        installRoot: root,
+        gobin: root,
         platform: "darwin",
         arch: "arm64",
         fetchLatestVersion: async () => CLASH_SPEEDTEST_VERSION,
@@ -99,7 +107,7 @@ describe("getClashSpeedtestState", () => {
     ).resolves.toMatchObject({
       status: "ready",
       path: binaryPath,
-      source: "cache",
+      source: "go-install",
       updateAvailable: false,
       latestVersion: CLASH_SPEEDTEST_VERSION,
       updateCheckStatus: "ok",
@@ -109,13 +117,14 @@ describe("getClashSpeedtestState", () => {
 
   test("surfaces update availability from the latest release tag", async () => {
     const root = join(tmpdir(), `latency-compass-update-${Date.now()}`);
-    const installDir = getClashSpeedtestInstallDir(root);
-    mkdirSync(installDir, { recursive: true });
-    writeFileSync(join(installDir, "clash-speedtest"), "");
+    const binaryPath = join(root, "clash-speedtest");
+    mkdirSync(root, { recursive: true });
+    writeFileSync(binaryPath, "");
+    chmodSync(binaryPath, 0o755);
 
     await expect(
       getClashSpeedtestState({
-        installRoot: root,
+        gobin: root,
         platform: "darwin",
         arch: "arm64",
         fetchLatestVersion: async () => "v0.0.2",
@@ -135,7 +144,8 @@ describe("getClashSpeedtestState", () => {
 
     await expect(
       getClashSpeedtestState({
-        installRoot: root,
+        gobin: root,
+        goPath: root,
         platform: "darwin",
         arch: "arm64",
         fetchLatestVersion: async () => {
@@ -153,14 +163,14 @@ describe("getClashSpeedtestState", () => {
 
   test("keeps ready installs usable when update checks fail", async () => {
     const root = join(tmpdir(), `latency-compass-ready-update-check-failed-${Date.now()}`);
-    const installDir = getClashSpeedtestInstallDir(root);
-    const binaryPath = join(installDir, "clash-speedtest");
-    mkdirSync(installDir, { recursive: true });
+    const binaryPath = join(root, "clash-speedtest");
+    mkdirSync(root, { recursive: true });
     writeFileSync(binaryPath, "");
+    chmodSync(binaryPath, 0o755);
 
     await expect(
       getClashSpeedtestState({
-        installRoot: root,
+        gobin: root,
         platform: "darwin",
         arch: "arm64",
         fetchLatestVersion: async () => {

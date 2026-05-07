@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { ApplicationMenu, BrowserView, BrowserWindow, Utils } from "electrobun/bun";
@@ -7,7 +7,7 @@ import { LatencyDatabase } from "./db";
 import { chooseClashSpeedtestBinary, chooseConfigFile, chooseExportDirectory } from "./file-dialog";
 import { buildApplicationMenu } from "./menu";
 import { runLatencyTest } from "./runner";
-import { CLASH_SPEEDTEST_VERSION, getClashSpeedtestState, makeClashSpeedtestState } from "./clash-speedtest";
+import { getClashSpeedtestState, makeClashSpeedtestState } from "./clash-speedtest";
 import { REGION_PRESETS, type HistoryFilters } from "../shared/domain";
 import { APP_RPC_TIMEOUT_MS, type AppRPC, type ClashSpeedtestState } from "../shared/rpc";
 
@@ -50,6 +50,36 @@ const rpc = BrowserView.defineRPC<AppRPC>({
         );
         return selectedPath;
       },
+      setClashSpeedtestBinaryPath: async ({ path }) => {
+        const selectedPath = path.trim();
+        if (!selectedPath) return null;
+        manualClashSpeedtestPath = selectedPath;
+        await Bun.write(manualBinaryPathFile, `${selectedPath}\n`);
+        clashSpeedtestState = await getClashSpeedtestState({ envPath: manualClashSpeedtestPath });
+        publishClashSpeedtestState(
+          makeClashSpeedtestState({
+            ...clashSpeedtestState,
+            source: "manual",
+            path: manualClashSpeedtestPath,
+            message: `已指定 clash-speedtest 路径：${selectedPath}`,
+            checkedAt: new Date().toISOString(),
+          }),
+        );
+        return selectedPath;
+      },
+      resetClashSpeedtestBinaryPath: async () => {
+        manualClashSpeedtestPath = null;
+        rmSync(manualBinaryPathFile, { force: true });
+        clashSpeedtestState = await getClashSpeedtestState();
+        publishClashSpeedtestState(
+          makeClashSpeedtestState({
+            ...clashSpeedtestState,
+            message: clashSpeedtestState.path ? "已切换为系统命令依赖" : "已切换为系统命令依赖，当前未检测到 clash-speedtest",
+            checkedAt: new Date().toISOString(),
+          }),
+        );
+        return { cleared: true };
+      },
       openExternalUrl: async ({ url }) => {
         await openExternalUrl(url);
         return null;
@@ -58,10 +88,10 @@ const rpc = BrowserView.defineRPC<AppRPC>({
         publishClashSpeedtestState(
           makeClashSpeedtestState({
             ...clashSpeedtestState,
-            status: clashSpeedtestState.path ? "ready" : "downloading",
+            status: clashSpeedtestState.path ? "ready" : "missing",
             message: clashSpeedtestState.path
-              ? `clash-speedtest 已就绪，当前版本 ${CLASH_SPEEDTEST_VERSION}`
-              : `正在下载 clash-speedtest ${CLASH_SPEEDTEST_VERSION}`,
+              ? "已检测到 clash-speedtest，开始执行测试"
+              : "未检测到 clash-speedtest，请先安装后再开始测试",
             checkedAt: new Date().toISOString(),
           }),
         );
@@ -73,26 +103,6 @@ const rpc = BrowserView.defineRPC<AppRPC>({
               binaryPath: manualClashSpeedtestPath && existsSync(manualClashSpeedtestPath) ? manualClashSpeedtestPath : undefined,
               onProgress: (message) => {
                 window.webview.rpc?.send.progress({ message });
-                if (message.includes("下载 clash-speedtest")) {
-                  publishClashSpeedtestState(
-                    makeClashSpeedtestState({
-                      ...clashSpeedtestState,
-                      status: "downloading",
-                      message,
-                      checkedAt: new Date().toISOString(),
-                    }),
-                  );
-                }
-                if (message.includes("clash-speedtest 准备完成")) {
-                  publishClashSpeedtestState(
-                    makeClashSpeedtestState({
-                      ...clashSpeedtestState,
-                      status: "ready",
-                      message,
-                      checkedAt: new Date().toISOString(),
-                    }),
-                  );
-                }
               },
             },
           );

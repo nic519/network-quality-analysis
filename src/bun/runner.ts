@@ -68,7 +68,6 @@ export async function runLatencyTest(request: RunRequest, options: RunnerOptions
     options.binaryPath ??
     (await resolveClashSpeedtestPath({
       ...options.binaryResolverOptions,
-      onProgress: options.onProgress,
     }));
   validateBinaryInput(binaryPath);
   const execute = options.execute ?? executeSpeedtest;
