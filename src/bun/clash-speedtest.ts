@@ -68,6 +68,8 @@ export async function getClashSpeedtestState(options: ClashSpeedtestStatusOption
     path: local.path,
     source: local.source,
     latestVersion: null,
+    updateCheckStatus: "idle",
+    updateCheckMessage: null,
     checkedAt: now().toISOString(),
   });
 
@@ -80,14 +82,14 @@ export async function getClashSpeedtestState(options: ClashSpeedtestStatusOption
       ...base,
       latestVersion,
       updateAvailable: latestVersion ? isNewerVersion(latestVersion, CLASH_SPEEDTEST_VERSION) : null,
+      updateCheckStatus: "ok",
+      updateCheckMessage: null,
     });
   } catch (error) {
     return makeClashSpeedtestState({
       ...base,
-      status: local.path ? "ready" : "error",
-      message: local.path
-        ? `clash-speedtest 已就绪，检查更新失败：${toErrorMessage(error)}`
-        : `clash-speedtest 未下载，检查更新失败：${toErrorMessage(error)}`,
+      updateCheckStatus: "failed",
+      updateCheckMessage: toErrorMessage(error),
     });
   }
 }
@@ -109,12 +111,16 @@ export function makeClashSpeedtestState(
 ): ClashSpeedtestState {
   const updateAvailable =
     input.updateAvailable ?? (input.latestVersion ? isNewerVersion(input.latestVersion, CLASH_SPEEDTEST_VERSION) : null);
+  const updateCheckStatus = input.updateCheckStatus ?? "idle";
+  const updateCheckMessage = input.updateCheckMessage ?? null;
   const path = input.path ?? null;
   const source = input.source ?? null;
   const message = input.message ?? describeClashSpeedtestState(input.status, {
     latestVersion: input.latestVersion ?? null,
     path,
     updateAvailable,
+    updateCheckStatus,
+    updateCheckMessage,
   });
 
   return {
@@ -122,6 +128,8 @@ export function makeClashSpeedtestState(
     version: CLASH_SPEEDTEST_VERSION,
     latestVersion: input.latestVersion ?? null,
     updateAvailable,
+    updateCheckStatus,
+    updateCheckMessage,
     path,
     source,
     message,
@@ -271,12 +279,22 @@ function describeClashSpeedtestState(
     latestVersion: string | null;
     path: string | null;
     updateAvailable: boolean | null;
+    updateCheckStatus: ClashSpeedtestState["updateCheckStatus"];
+    updateCheckMessage: string | null;
   },
 ) {
   if (status === "downloading") return `正在下载 clash-speedtest ${CLASH_SPEEDTEST_VERSION}`;
   if (status === "checking-update") return "正在检查 clash-speedtest 更新";
   if (status === "error") return "clash-speedtest 状态检查失败";
-  if (!details.path) return `clash-speedtest 未下载，首次测试会自动下载 ${CLASH_SPEEDTEST_VERSION}`;
+  if (!details.path) {
+    if (details.updateCheckStatus === "failed" && details.updateCheckMessage) {
+      return `clash-speedtest 未下载，更新检查失败：${details.updateCheckMessage}`;
+    }
+    return `clash-speedtest 未下载，首次测试会自动下载 ${CLASH_SPEEDTEST_VERSION}`;
+  }
+  if (details.updateCheckStatus === "failed" && details.updateCheckMessage) {
+    return `clash-speedtest 已就绪，检查更新失败：${details.updateCheckMessage}`;
+  }
   if (details.updateAvailable) {
     return `clash-speedtest 已就绪，GitHub 有新版本 ${details.latestVersion}`;
   }

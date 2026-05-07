@@ -18,6 +18,11 @@ type ChooseExportDirectoryOptions = {
   openFileDialog: (options: OpenFileDialogOptions) => Promise<string[]>;
 };
 
+type ChooseClashSpeedtestBinaryOptions = {
+  currentPath?: string | null;
+  openFileDialog: (options: OpenFileDialogOptions) => Promise<string[]>;
+};
+
 export async function chooseConfigFile({
   currentPath,
   openFileDialog,
@@ -39,6 +44,22 @@ export async function chooseExportDirectory({ openFileDialog }: ChooseExportDire
     startingFolder: "~",
     canChooseFiles: false,
     canChooseDirectory: true,
+    allowsMultipleSelection: false,
+  });
+
+  const selectedPath = paths.map(normalizeSelectedPath).find((path) => path.length > 0);
+  return selectedPath ?? null;
+}
+
+export async function chooseClashSpeedtestBinary({
+  currentPath,
+  openFileDialog,
+}: ChooseClashSpeedtestBinaryOptions) {
+  const paths = await openFileDialog({
+    startingFolder: getStartingFolder(currentPath ?? undefined),
+    allowedFileTypes: "",
+    canChooseFiles: true,
+    canChooseDirectory: false,
     allowsMultipleSelection: false,
   });
 

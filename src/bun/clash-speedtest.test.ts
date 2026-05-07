@@ -76,6 +76,8 @@ describe("getClashSpeedtestState", () => {
       source: null,
       updateAvailable: false,
       latestVersion: CLASH_SPEEDTEST_VERSION,
+      updateCheckStatus: "ok",
+      updateCheckMessage: null,
     });
   });
 
@@ -100,6 +102,8 @@ describe("getClashSpeedtestState", () => {
       source: "cache",
       updateAvailable: false,
       latestVersion: CLASH_SPEEDTEST_VERSION,
+      updateCheckStatus: "ok",
+      updateCheckMessage: null,
     });
   });
 
@@ -121,6 +125,54 @@ describe("getClashSpeedtestState", () => {
       status: "ready",
       updateAvailable: true,
       latestVersion: "v0.0.2",
+      updateCheckStatus: "ok",
+      updateCheckMessage: null,
+    });
+  });
+
+  test("keeps missing installs non-blocking when update checks fail", async () => {
+    const root = join(tmpdir(), `latency-compass-missing-update-check-failed-${Date.now()}`);
+
+    await expect(
+      getClashSpeedtestState({
+        installRoot: root,
+        platform: "darwin",
+        arch: "arm64",
+        fetchLatestVersion: async () => {
+          throw new Error("403 rate limited");
+        },
+        now: () => new Date("2026-05-07T00:00:00.000Z"),
+      }),
+    ).resolves.toMatchObject({
+      status: "missing",
+      path: null,
+      updateCheckStatus: "failed",
+      updateCheckMessage: "403 rate limited",
+    });
+  });
+
+  test("keeps ready installs usable when update checks fail", async () => {
+    const root = join(tmpdir(), `latency-compass-ready-update-check-failed-${Date.now()}`);
+    const installDir = getClashSpeedtestInstallDir(root);
+    const binaryPath = join(installDir, "clash-speedtest");
+    mkdirSync(installDir, { recursive: true });
+    writeFileSync(binaryPath, "");
+
+    await expect(
+      getClashSpeedtestState({
+        installRoot: root,
+        platform: "darwin",
+        arch: "arm64",
+        fetchLatestVersion: async () => {
+          throw new Error("timeout");
+        },
+        now: () => new Date("2026-05-07T00:00:00.000Z"),
+      }),
+    ).resolves.toMatchObject({
+      status: "ready",
+      path: binaryPath,
+      updateCheckStatus: "failed",
+      updateCheckMessage: "timeout",
     });
   });
 });

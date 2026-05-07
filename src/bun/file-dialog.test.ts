@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { chooseConfigFile, chooseExportDirectory } from "./file-dialog";
+import { chooseClashSpeedtestBinary, chooseConfigFile, chooseExportDirectory } from "./file-dialog";
 
 describe("chooseConfigFile", () => {
   test("returns the selected config path", async () => {
@@ -59,6 +59,34 @@ describe("chooseExportDirectory", () => {
 
   test("returns null when export folder selection is cancelled", async () => {
     const selected = await chooseExportDirectory({
+      openFileDialog: async () => [""],
+    });
+
+    expect(selected).toBeNull();
+  });
+});
+
+describe("chooseClashSpeedtestBinary", () => {
+  test("returns the selected binary path", async () => {
+    const selected = await chooseClashSpeedtestBinary({
+      currentPath: "/Users/nicholas/Downloads/clash-speedtest",
+      openFileDialog: async (options) => {
+        expect(options).toMatchObject({
+          startingFolder: "/Users/nicholas/Downloads",
+          canChooseFiles: true,
+          canChooseDirectory: false,
+          allowsMultipleSelection: false,
+        });
+        return ["/Users/nicholas/Downloads/clash-speedtest"];
+      },
+    });
+
+    expect(selected).toBe("/Users/nicholas/Downloads/clash-speedtest");
+  });
+
+  test("returns null when binary selection is cancelled", async () => {
+    const selected = await chooseClashSpeedtestBinary({
+      currentPath: undefined,
       openFileDialog: async () => [""],
     });
 

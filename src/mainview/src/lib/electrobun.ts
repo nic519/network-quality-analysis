@@ -53,6 +53,8 @@ function createPreviewApi() {
       version: "v0.0.1",
       latestVersion: "v0.0.1",
       updateAvailable: false,
+      updateCheckStatus: "ok",
+      updateCheckMessage: null,
       path: "~/Library/Application Support/Latency Compass/bin/clash-speedtest/v0.0.1/clash-speedtest",
       source: "cache",
       message: "clash-speedtest 已就绪，当前为最新版本 v0.0.1",
@@ -107,6 +109,14 @@ function createPreviewApi() {
     selectConfigFile: async ({ currentPath }: { currentPath?: string }) => {
       progressHandler?.("浏览器预览模式：系统文件选择器会在 Electrobun 桌面应用内打开");
       return currentPath?.trim() ? currentPath : null;
+    },
+    selectClashSpeedtestBinary: async ({ currentPath }: { currentPath?: string | null }) => {
+      progressHandler?.("浏览器预览模式：请在桌面应用中选择 clash-speedtest 二进制");
+      return currentPath?.trim() ? currentPath : "/Users/nicholas/Downloads/clash-speedtest";
+    },
+    openExternalUrl: async ({ url }: { url: string }) => {
+      window.open(url, "_blank", "noopener,noreferrer");
+      return null;
     },
     exportCsv: async (_filters: HistoryFilters): Promise<ExportCsvResponse> => ({
       summaryPath: "~/Desktop/latency-preview-summary.csv",
