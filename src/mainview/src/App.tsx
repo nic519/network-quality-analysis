@@ -3,9 +3,9 @@ import { TopNavigation, type AppView } from "./components/top-navigation";
 import { RunSetupView } from "./components/run-setup-view";
 import { AnalysisView } from "./components/analysis-view";
 import { DiagnosticsView } from "./components/diagnostics-view";
-import { buildLatencyChartRows, type MatrixRow } from "./lib/chart-data";
+import type { MatrixRow } from "./lib/chart-data";
 import { api, onClashSpeedtestStatus, onProgress } from "./lib/electrobun";
-import { DEFAULT_SITES, REGION_PRESETS, latencyStatus, latencyToMs } from "../../shared/domain";
+import { DEFAULT_SITES, REGION_PRESETS, latencyToMs } from "../../shared/domain";
 import type { AppState } from "../../shared/rpc";
 
 const today = new Date().toISOString().slice(0, 10);
@@ -80,17 +80,6 @@ export default function App() {
     });
   }, [filters]);
 
-  const matrixRows = useMemo(() => buildMatrixRows(state.results, search), [search, state.results]);
-  const selectedSite = DEFAULT_SITES.find((site) => site.id === selectedSiteId) ?? DEFAULT_SITES[0];
-  const latencyChartRows = useMemo(() => buildLatencyChartRows(matrixRows, selectedSite?.name), [matrixRows, selectedSite?.name]);
-  const availableChartRows = useMemo(() => latencyChartRows.filter((row) => row.isAvailable), [latencyChartRows]);
-  const unavailableChartRows = useMemo(() => latencyChartRows.filter((row) => !row.isAvailable), [latencyChartRows]);
-  const summaryResults = useMemo(
-    () => selectRunScopedResults(state.results, selectedRunId),
-    [selectedRunId, state.results],
-  );
-  const summary = useMemo(() => summarize(summaryResults), [summaryResults]);
-  const latestRun = state.runs[0];
   const recentConfigPaths = state.configHistory.filter((item) => item.path !== configPath);
   const diagnosticsHint = getDiagnosticsHint(state.clashSpeedtest);
 
@@ -219,10 +208,6 @@ export default function App() {
           onSearchChange={setSearch}
           selectedSiteId={selectedSiteId}
           onSelectedSiteIdChange={setSelectedSiteId}
-          summary={summary}
-          latestRunLabel={latestRun ? formatDate(latestRun.startedAt) : "暂无"}
-          availableChartRows={availableChartRows}
-          unavailableChartRows={unavailableChartRows}
           progress={progress}
           error={error}
           onExportCsv={exportCsv}
@@ -275,32 +260,9 @@ function buildMatrixRows(results: AppState["results"], search: string): MatrixRo
   });
 }
 
-function selectRunScopedResults(results: AppState["results"], selectedRunId: string) {
-  const runId = selectedRunId === "all" ? results[0]?.runId : selectedRunId;
-  return runId ? results.filter((row) => row.runId === runId) : results;
-}
-
-function summarize(results: AppState["results"]) {
-  const latencies = results.map((row) => latencyToMs(row.latency)).filter((value): value is number => value !== null);
-  const fastest = latencies.length ? `${Math.min(...latencies).toFixed(0)}ms` : "暂无";
-  const available = results.filter((row) => ["fast", "usable", "slow"].includes(latencyStatus(row.latency))).length;
-  const availability = results.length ? `${Math.round((available / results.length) * 100)}%` : "暂无";
-  const siteCount = new Set(results.map((row) => row.siteId)).size;
-  return { fastest, availability, siteCount };
-}
-
 function bestLatency(values: Record<string, string>) {
   const latencies = Object.values(values).map(latencyToMs).filter((value): value is number => value !== null);
   return latencies.length ? Math.min(...latencies) : Number.POSITIVE_INFINITY;
-}
-
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat("zh-CN", {
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value));
 }
 
 function getDiagnosticsHint(state: AppState["clashSpeedtest"]) {
