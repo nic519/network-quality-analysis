@@ -26,6 +26,10 @@ export function writeCsvExport(results: ResultRow[], outputDir: string, basename
   return { summaryPath };
 }
 
+export function copyCsvExport(results: ResultRow[]): string {
+  return buildCsvExport(results).summary;
+}
+
 function buildSummaryCsv(results: ResultRow[]): string {
   const sites = Array.from(new Set(results.map((row) => row.siteName)));
   const rowsByProxy = new Map<string, ResultRow[]>();

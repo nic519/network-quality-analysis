@@ -1,4 +1,4 @@
-import { Activity, Circle, CircleDot, Download, Search } from "lucide-react";
+import { Activity, Circle, CircleDot, Copy, Download, Search } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
@@ -24,7 +24,8 @@ export function AnalysisView({
   onSelectedSiteIdChange,
   progress,
   error,
-  onExportCsv,
+  onCopyResults,
+  onExportAllResults,
 }: {
   state: AppState;
   selectedRunId: string;
@@ -39,7 +40,8 @@ export function AnalysisView({
   onSelectedSiteIdChange: (value: string) => void;
   progress: string;
   error: string | null;
-  onExportCsv: () => void;
+  onCopyResults: () => void;
+  onExportAllResults: () => void;
 }) {
   const selectedSite = DEFAULT_SITES.find((site) => site.id === selectedSiteId) ?? DEFAULT_SITES[0];
   const selectedRun = state.runs.find((run) => run.id === selectedRunId) ?? null;
@@ -106,7 +108,7 @@ export function AnalysisView({
                       role="radio"
                       aria-checked={isActive}
                       className={cn(
-                        "flex w-full items-start gap-3 rounded-2xl border px-4 py-3 text-left transition-all",
+                        "flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left transition-all",
                         isActive
                           ? "border-amber-500/35 bg-amber-500/10 text-amber-50 shadow-[inset_0_0_0_1px_rgba(245,158,11,0.18)]"
                           : "border-transparent bg-transparent text-stone-300 hover:border-stone-800 hover:bg-stone-900/75",
@@ -114,19 +116,12 @@ export function AnalysisView({
                       title={run.id}
                       onClick={() => onSelectedRunIdChange(run.id)}
                     >
-                      <div className="mt-0.5 text-stone-500">
-                        {isActive ? <CircleDot className="h-4 w-4 text-amber-300" /> : <Circle className="h-4 w-4" />}
-                      </div>
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="truncate text-sm font-medium text-stone-100">{formatRunStatus(run.status)}</span>
-                          <span className="text-[11px] text-stone-500">{formatDate(run.startedAt)}</span>
+                        <div className="flex items-center gap-2 text-sm">
+                          <span className="truncate font-medium text-stone-100">{shortenId(run.id)}</span>
+                          <span className="truncate text-stone-500">{formatRunRegion(run, state.results)}</span>
                         </div>
-                        <div className="mt-2 flex items-center gap-2 text-xs text-stone-500">
-                          <span className="truncate">{shortenId(run.id)}</span>
-                          <span className="h-1 w-1 rounded-full bg-stone-700" />
-                          <span>{countRunResults(state.results, run.id)} 条</span>
-                        </div>
+                        <div className="mt-1 text-xs text-stone-500">{formatDate(run.startedAt)}</div>
                       </div>
                     </button>
                   );
@@ -137,80 +132,86 @@ export function AnalysisView({
 
           <div className="bg-[linear-gradient(180deg,rgba(20,20,18,0.96),rgba(12,12,11,0.98))]">
             <div className="border-b border-stone-900 px-6 py-4">
-              <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto]">
-                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto]">
-                  <div className="grid gap-3 sm:grid-cols-2 xl:w-[360px]">
-                    <label className="space-y-2">
-                      <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-500">From</span>
-                      <Input
-                        type="date"
-                        value={fromDate}
-                        onChange={(event) => onFromDateChange(event.target.value)}
-                        className="border-stone-800 bg-stone-950/90 text-stone-100"
-                      />
-                    </label>
-                    <label className="space-y-2">
-                      <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-500">To</span>
-                      <Input
-                        type="date"
-                        value={toDate}
-                        onChange={(event) => onToDateChange(event.target.value)}
-                        className="border-stone-800 bg-stone-950/90 text-stone-100"
-                      />
-                    </label>
-                  </div>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-3 h-4 w-4 text-stone-500" />
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                <div className="flex min-w-0 flex-1 flex-wrap items-end gap-3">
+                  <label className="space-y-2">
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-500">From</span>
+                    <Input
+                      type="date"
+                      value={fromDate}
+                      onChange={(event) => onFromDateChange(event.target.value)}
+                      className="w-[176px] border-stone-800 bg-stone-950/90 text-stone-100"
+                    />
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-500">To</span>
+                    <Input
+                      type="date"
+                      value={toDate}
+                      onChange={(event) => onToDateChange(event.target.value)}
+                      className="w-[176px] border-stone-800 bg-stone-950/90 text-stone-100"
+                    />
+                  </label>
+                  <label className="relative w-full max-w-[320px] space-y-2">
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-500">Search</span>
+                    <Search className="pointer-events-none absolute left-3 top-[38px] h-4 w-4 text-stone-500" />
                     <Input
                       value={search}
                       onChange={(event) => onSearchChange(event.target.value)}
                       placeholder="搜索节点名称"
                       className="h-11 border-stone-800 bg-stone-950/90 pl-9 text-stone-100 placeholder:text-stone-500"
                     />
-                  </div>
-                  <Button variant="outline" className="h-11 border-stone-800 bg-stone-950/90 text-stone-200 hover:bg-stone-900" onClick={onExportCsv} disabled={!state.results.length}>
-                    <Download className="h-4 w-4" />
-                    导出 CSV
-                  </Button>
+                  </label>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                  {DEFAULT_SITES.map((site) => {
-                    const active = site.id === selectedSite?.id;
-                    return (
-                      <Button
-                        key={site.id}
-                        type="button"
-                        variant="ghost"
-                        className={cn(
-                          "h-10 rounded-full border px-4 text-sm",
-                          active
-                            ? "border-emerald-500/40 bg-emerald-500/12 text-emerald-100 hover:bg-emerald-500/18"
-                            : "border-stone-800 bg-stone-950/80 text-stone-400 hover:bg-stone-900 hover:text-stone-100",
-                        )}
-                        onClick={() => onSelectedSiteIdChange(site.id)}
-                      >
-                        {site.name}
-                      </Button>
-                    );
-                  })}
+                  <Button variant="outline" className="h-11 border-stone-800 bg-stone-950/90 text-stone-200 hover:bg-stone-900" onClick={onCopyResults} disabled={!state.results.length}>
+                    <Copy className="h-4 w-4" />
+                    复制结果
+                  </Button>
+                  <Button variant="outline" className="h-11 border-stone-800 bg-stone-950/90 text-stone-200 hover:bg-stone-900" onClick={onExportAllResults} disabled={!state.results.length}>
+                    <Download className="h-4 w-4" />
+                    导出所有结果
+                  </Button>
                 </div>
+              </div>
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                {DEFAULT_SITES.map((site) => {
+                  const active = site.id === selectedSite?.id;
+                  return (
+                    <Button
+                      key={site.id}
+                      type="button"
+                      variant="ghost"
+                      className={cn(
+                        "h-10 rounded-full border px-4 text-sm",
+                        active
+                          ? "border-emerald-500/40 bg-emerald-500/12 text-emerald-100 hover:bg-emerald-500/18"
+                          : "border-stone-800 bg-stone-950/80 text-stone-400 hover:bg-stone-900 hover:text-stone-100",
+                      )}
+                      onClick={() => onSelectedSiteIdChange(site.id)}
+                    >
+                      {site.name}
+                    </Button>
+                  );
+                })}
               </div>
               {error ? <div className="mt-3 text-sm text-red-300">{error}</div> : null}
             </div>
 
-            <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_288px]">
-              <section className="min-w-0 border-b border-stone-900 px-6 py-6 xl:border-b-0 xl:border-r">
-                <div className="mb-4 flex justify-end">
+            <div className="grid gap-0">
+              <section className="min-w-0 border-b border-stone-900 px-6 py-6">
+                <div className="mb-4 flex items-center justify-between gap-4">
+                  <div className="text-sm text-stone-400">
+                    {selectedRun ? `当前批次 · ${formatDate(selectedRun.startedAt)}` : progress}
+                  </div>
                   <div className="flex items-center gap-2 rounded-full border border-stone-800 bg-stone-950/80 px-3 py-2 text-xs text-stone-400">
                     <Activity className="h-3.5 w-3.5 text-emerald-300" />
-                    <span>
-                      {selectedRun ? `${formatDate(selectedRun.startedAt)} · ${formatRunStatus(selectedRun.status)}` : progress}
-                    </span>
+                    <span>{selectedSite?.name}</span>
                   </div>
                 </div>
 
-                <div className="h-[440px] rounded-[24px] border border-stone-900 bg-black/20 px-3 py-3">
+                <div className="h-[420px] rounded-[24px] border border-stone-900 bg-black/20 px-3 py-3">
                   {availableChartRows.length ? (
                     <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} initialDimension={{ width: 800, height: 420 }}>
                       <BarChart accessibilityLayer data={availableChartRows.slice(0, 12)} layout="vertical" margin={{ left: 8, right: 36, top: 8, bottom: 8 }}>
@@ -261,56 +262,52 @@ export function AnalysisView({
                     </div>
                   )}
                 </div>
-              </section>
 
-              <aside className="px-6 py-6">
-                <div className="space-y-6">
-                  <section>
-                    <div className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">Failures</div>
-                    <div className="mt-3 rounded-[22px] border border-stone-900 bg-stone-950/70 p-4">
-                      <div className="mb-3 text-sm font-medium text-stone-100">测试失败记录</div>
-                      {failedSiteRows.length ? (
-                        <div className="custom-scrollbar max-h-[320px] overflow-auto rounded-2xl border border-stone-800 bg-black/20">
-                          <Table>
-                            <TableHeader className="[&_tr]:border-stone-800">
-                              <TableRow className="hover:bg-transparent">
-                                <TableHead className="h-10 px-3 text-[11px] uppercase tracking-[0.16em] text-stone-500">节点</TableHead>
-                                <TableHead className="h-10 px-3 text-[11px] uppercase tracking-[0.16em] text-stone-500">失败网站</TableHead>
+                <section className="mt-6">
+                  <div className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">Failures</div>
+                  <div className="mt-3 rounded-[22px] border border-stone-900 bg-stone-950/70 p-4">
+                    <div className="mb-3 text-sm font-medium text-stone-100">测试失败记录</div>
+                    {failedSiteRows.length ? (
+                      <div className="custom-scrollbar max-h-[260px] overflow-auto rounded-2xl border border-stone-800 bg-black/20">
+                        <Table>
+                          <TableHeader className="[&_tr]:border-stone-800">
+                            <TableRow className="hover:bg-transparent">
+                              <TableHead className="h-10 px-3 text-[11px] uppercase tracking-[0.16em] text-stone-500">节点</TableHead>
+                              <TableHead className="h-10 px-3 text-[11px] uppercase tracking-[0.16em] text-stone-500">失败网站</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody className="[&_tr:last-child]:border-stone-800">
+                            {failedSiteRows.map((row) => (
+                              <TableRow key={row.key} className="border-stone-800 hover:bg-stone-900/40">
+                                <TableCell className="px-3 py-2.5">
+                                  <div className="truncate text-sm text-stone-100">
+                                    <span className="font-medium">{row.proxyName}</span>
+                                    <span className="mx-2 text-stone-600">·</span>
+                                    <span className="text-xs text-stone-500">
+                                      {row.proxyType} / {row.regionLabel}
+                                    </span>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="px-3 py-2.5">
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {row.failedSites.map((siteName) => (
+                                      <Badge key={`${row.key}-${siteName}`} variant="outline" className="border-stone-700 bg-stone-900/80 text-stone-300">
+                                        {siteName}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                </TableCell>
                               </TableRow>
-                            </TableHeader>
-                            <TableBody className="[&_tr:last-child]:border-stone-800">
-                              {failedSiteRows.map((row) => (
-                                <TableRow key={row.key} className="border-stone-800 hover:bg-stone-900/40">
-                                  <TableCell className="px-3 py-2.5">
-                                    <div className="truncate text-sm text-stone-100">
-                                      <span className="font-medium">{row.proxyName}</span>
-                                      <span className="mx-2 text-stone-600">·</span>
-                                      <span className="text-xs text-stone-500">
-                                        {row.proxyType} / {row.regionLabel}
-                                      </span>
-                                    </div>
-                                  </TableCell>
-                                  <TableCell className="px-3 py-2.5">
-                                    <div className="flex flex-wrap gap-1.5">
-                                      {row.failedSites.map((siteName) => (
-                                        <Badge key={`${row.key}-${siteName}`} variant="outline" className="border-stone-700 bg-stone-900/80 text-stone-300">
-                                          {siteName}
-                                        </Badge>
-                                      ))}
-                                    </div>
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </div>
-                      ) : (
-                        <div className="text-sm leading-6 text-stone-500">当前批次或时间范围内没有失败记录。</div>
-                      )}
-                    </div>
-                  </section>
-                </div>
-              </aside>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    ) : (
+                      <div className="text-sm leading-6 text-stone-500">当前批次或时间范围内没有失败记录。</div>
+                    )}
+                  </div>
+                </section>
+              </section>
             </div>
           </div>
         </div>
@@ -413,12 +410,9 @@ function buildFailedSiteRows(results: AppState["results"], search: string) {
   });
 }
 
-function countRunResults(results: AppState["results"], runId: string) {
-  return results.filter((item) => item.runId === runId).length;
-}
-
-function formatRunStatus(status: AppState["runs"][number]["status"]) {
-  return status === "completed" ? "完成" : status === "failed" ? "失败" : "运行中";
+function formatRunRegion(run: AppState["runs"][number], results: AppState["results"]) {
+  const regions = Array.from(new Set(results.filter((item) => item.runId === run.id).map((item) => item.regionLabel)));
+  return regions.length ? regions.join(" / ") : run.selectedRegions.join(" / ");
 }
 
 function formatDate(value: string) {
