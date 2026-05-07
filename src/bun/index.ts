@@ -1,13 +1,15 @@
 import { mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { BrowserView, BrowserWindow } from "electrobun/bun";
+import { ApplicationMenu, BrowserView, BrowserWindow, Utils } from "electrobun/bun";
 import { writeCsvExport } from "./csv";
 import { LatencyDatabase } from "./db";
 import { chooseConfigFile } from "./file-dialog";
+import { buildApplicationMenu } from "./menu";
 import { runLatencyTest } from "./runner";
+import { CLASH_SPEEDTEST_VERSION, getClashSpeedtestState, makeClashSpeedtestState } from "./clash-speedtest";
 import { REGION_PRESETS, type HistoryFilters } from "../shared/domain";
-import type { AppRPC } from "../shared/rpc";
+import { APP_RPC_TIMEOUT_MS, type AppRPC, type ClashSpeedtestState } from "../shared/rpc";
 
 const appDir = join(homedir(), "Library/Application Support/Latency Compass");
 const exportDir = join(appDir, "exports");
@@ -15,24 +17,77 @@ mkdirSync(appDir, { recursive: true });
 
 const db = new LatencyDatabase(join(appDir, "latency-compass.sqlite"));
 db.migrate();
+ApplicationMenu.setApplicationMenu(buildApplicationMenu());
+let clashSpeedtestState = makeClashSpeedtestState({
+  status: "checking-update",
+  checkedAt: new Date().toISOString(),
+});
 
 const rpc = BrowserView.defineRPC<AppRPC>({
-  maxRequestTime: 30 * 60 * 1000,
+  maxRequestTime: APP_RPC_TIMEOUT_MS,
   handlers: {
     requests: {
       getAppState: (filters) => getAppState(filters),
-      selectConfigFile: ({ currentPath }) => chooseConfigFile({ currentPath }),
+      selectConfigFile: ({ currentPath }) => chooseConfigFile({ currentPath, openFileDialog: Utils.openFileDialog }),
       startRun: async ({ configPath, regionIds }) => {
-        const output = await runLatencyTest(
-          { configPath, regionIds },
-          {
-            onProgress: (message) => window.webview.rpc?.send.progress({ message }),
-          },
+        publishClashSpeedtestState(
+          makeClashSpeedtestState({
+            ...clashSpeedtestState,
+            status: clashSpeedtestState.path ? "ready" : "downloading",
+            message: clashSpeedtestState.path
+              ? `clash-speedtest 已就绪，当前版本 ${CLASH_SPEEDTEST_VERSION}`
+              : `正在下载 clash-speedtest ${CLASH_SPEEDTEST_VERSION}`,
+            checkedAt: new Date().toISOString(),
+          }),
         );
 
-        db.saveRun(output.run);
-        db.saveResults(output.results);
-        return getAppState({ regionIds });
+        try {
+          const output = await runLatencyTest(
+            { configPath, regionIds },
+            {
+              onProgress: (message) => {
+                window.webview.rpc?.send.progress({ message });
+                if (message.includes("下载 clash-speedtest")) {
+                  publishClashSpeedtestState(
+                    makeClashSpeedtestState({
+                      ...clashSpeedtestState,
+                      status: "downloading",
+                      message,
+                      checkedAt: new Date().toISOString(),
+                    }),
+                  );
+                }
+                if (message.includes("clash-speedtest 准备完成")) {
+                  publishClashSpeedtestState(
+                    makeClashSpeedtestState({
+                      ...clashSpeedtestState,
+                      status: "ready",
+                      message,
+                      checkedAt: new Date().toISOString(),
+                    }),
+                  );
+                }
+              },
+            },
+          );
+
+          db.saveRun(output.run);
+          db.saveResults(output.results);
+          db.saveConfigHistory(configPath, output.run.completedAt ?? output.run.startedAt);
+          clashSpeedtestState = await getClashSpeedtestState();
+          publishClashSpeedtestState(clashSpeedtestState);
+          return getAppState({ regionIds });
+        } catch (error) {
+          publishClashSpeedtestState(
+            makeClashSpeedtestState({
+              ...clashSpeedtestState,
+              status: "error",
+              message: `clash-speedtest 准备失败：${toErrorMessage(error)}`,
+              checkedAt: new Date().toISOString(),
+            }),
+          );
+          throw error;
+        }
       },
       exportCsv: (filters) => {
         const results = db.queryResults(filters);
@@ -60,10 +115,22 @@ window = new BrowserWindow<typeof rpc>({
   rpc,
 });
 
-function getAppState(filters: HistoryFilters = {}) {
+async function getAppState(filters: HistoryFilters = {}) {
+  clashSpeedtestState = await getClashSpeedtestState();
   return {
     regions: REGION_PRESETS,
     runs: db.listRuns(),
     results: db.queryResults(filters),
+    configHistory: db.listConfigHistory(),
+    clashSpeedtest: clashSpeedtestState,
   };
+}
+
+function publishClashSpeedtestState(state: ClashSpeedtestState) {
+  clashSpeedtestState = state;
+  window.webview.rpc?.send.clashSpeedtestStatus(state);
+}
+
+function toErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
 }

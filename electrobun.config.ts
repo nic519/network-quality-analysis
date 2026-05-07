@@ -23,7 +23,6 @@ export default {
     copy: {
       "src/mainview/electrobun.html": "views/mainview/index.html",
       "src/mainview/electrobun.css": "views/mainview/main.css",
-      "resources/bin/clash-speedtest": "resources/bin/clash-speedtest",
     },
   },
 } satisfies ElectrobunConfig;

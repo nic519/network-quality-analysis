@@ -1,10 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { REGION_PRESETS, type SiteDefinition } from "../shared/domain";
 import {
   buildSpeedtestArgs,
+  executeSpeedtest,
   normalizeSpeedtestRows,
   resolveBundledBinaryPathFrom,
   runLatencyTest,
@@ -18,7 +19,7 @@ const site: SiteDefinition = {
 };
 
 describe("buildSpeedtestArgs", () => {
-  test("uses fast mode and the site's latency URL", () => {
+  test("uses fast mode, the site's latency URL, and a short proxy timeout", () => {
     expect(buildSpeedtestArgs("config.yaml", REGION_PRESETS[0], site)).toEqual([
       "-c",
       "config.yaml",
@@ -28,6 +29,8 @@ describe("buildSpeedtestArgs", () => {
       "fast",
       "--latency-url",
       "https://www.youtube.com/generate_204",
+      "-timeout",
+      "8s",
     ]);
   });
 });
@@ -87,6 +90,83 @@ describe("runLatencyTest", () => {
     expect(output.run.status).toBe("completed");
     expect(output.results).toHaveLength(1);
   });
+
+  test("resolves clash-speedtest from the release cache when no binary path is provided", async () => {
+    const root = join(tmpdir(), `latency-runner-cache-${Date.now()}`);
+    const installDir = join(root, "clash-speedtest/v0.0.1");
+    const binaryPath = join(installDir, "clash-speedtest");
+    const configPath = join(root, "config.yaml");
+    mkdirSync(installDir, { recursive: true });
+    writeFileSync(binaryPath, "");
+    writeFileSync(configPath, "");
+    const binaries: string[] = [];
+
+    await runLatencyTest(
+      {
+        configPath,
+        regionIds: ["hong-kong"],
+      },
+      {
+        binaryResolverOptions: {
+          installRoot: root,
+          platform: "darwin",
+          arch: "arm64",
+        },
+        sites: [site],
+        execute: async (binary) => {
+          binaries.push(binary);
+          return "序号\t节点ID\t节点名称\t类型\t延迟\n1.\tproxy-1\tHK-01\tTrojan\t128ms\n";
+        },
+      },
+    );
+
+    expect(binaries).toEqual([binaryPath]);
+  });
+
+  test("reports each command before executing it", async () => {
+    const root = join(tmpdir(), `latency-runner-progress-${Date.now()}`);
+    const binaryPath = join(root, "clash-speedtest");
+    const configPath = join(root, "config.yaml");
+    mkdirSync(root, { recursive: true });
+    writeFileSync(binaryPath, "");
+    writeFileSync(configPath, "");
+    const messages: string[] = [];
+
+    await runLatencyTest(
+      {
+        configPath,
+        regionIds: ["hong-kong"],
+      },
+      {
+        binaryPath,
+        sites: [site],
+        onProgress: (message) => messages.push(message),
+        execute: async () => "序号\t节点ID\t节点名称\t类型\t延迟\n1.\tproxy-1\tHK-01\tTrojan\t128ms\n",
+      },
+    );
+
+    expect(messages).toContain("测试 香港 -> YouTube");
+    expect(messages.some((message) => message.includes("clash-speedtest -c") && message.includes("-timeout 8s"))).toBe(
+      true,
+    );
+  });
+
+  test("streams clash-speedtest output into progress messages", async () => {
+    const root = join(tmpdir(), `latency-runner-stream-${Date.now()}`);
+    const binaryPath = join(root, "clash-speedtest");
+    mkdirSync(root, { recursive: true });
+    writeFileSync(
+      binaryPath,
+      "#!/bin/sh\nprintf 'loading proxies\\n' >&2\nprintf '序号\\t节点名称\\t类型\\t延迟\\n1.\\tHK-01\\tTrojan\\t128ms\\n'\n",
+    );
+    chmodSync(binaryPath, 0o755);
+    const messages: string[] = [];
+
+    const output = await executeSpeedtest(binaryPath, [], { onProgress: (message) => messages.push(message) });
+
+    expect(output).toContain("HK-01");
+    expect(messages).toContain("[clash-speedtest] loading proxies");
+  });
 });
 
 describe("resolveBundledBinaryPathFrom", () => {
@@ -108,5 +188,9 @@ describe("validateRunnableInputs", () => {
     expect(() => validateRunnableInputs(import.meta.path, "/path/that/does/not/exist.yaml")).toThrow(
       "找不到 Clash/Mihomo 配置文件",
     );
+  });
+
+  test("accepts pasted config paths with surrounding whitespace", () => {
+    expect(() => validateRunnableInputs(import.meta.path, `  ${import.meta.path}  `)).not.toThrow();
   });
 });

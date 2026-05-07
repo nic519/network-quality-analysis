@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { resolveClashSpeedtestPath, type ResolveClashSpeedtestOptions } from "./clash-speedtest";
 import {
   DEFAULT_SITES,
   REGION_PRESETS,
@@ -18,15 +19,20 @@ export type RunRequest = {
 
 export type RunnerOptions = {
   binaryPath?: string;
+  binaryResolverOptions?: ResolveClashSpeedtestOptions;
   sites?: SiteDefinition[];
   now?: () => Date;
-  execute?: (binaryPath: string, args: string[]) => Promise<string>;
+  execute?: (binaryPath: string, args: string[], options?: ExecuteSpeedtestOptions) => Promise<string>;
   onProgress?: (message: string) => void;
 };
 
 export type RunOutput = {
   run: RunRecord;
   results: ResultRow[];
+};
+
+export type ExecuteSpeedtestOptions = {
+  onProgress?: (message: string) => void;
 };
 
 export function buildSpeedtestArgs(configPath: string, region: RegionPreset, site: SiteDefinition): string[] {
@@ -39,10 +45,13 @@ export function buildSpeedtestArgs(configPath: string, region: RegionPreset, sit
     "fast",
     "--latency-url",
     site.url,
+    "-timeout",
+    "8s",
   ];
 }
 
 export async function runLatencyTest(request: RunRequest, options: RunnerOptions = {}): Promise<RunOutput> {
+  const configPath = normalizeConfigInput(request.configPath);
   const now = options.now ?? (() => new Date());
   const startedAt = now();
   const run: RunRecord = {
@@ -54,8 +63,14 @@ export async function runLatencyTest(request: RunRequest, options: RunnerOptions
     errorMessage: null,
   };
 
-  const binaryPath = options.binaryPath ?? resolveBundledBinaryPath();
-  validateRunnableInputs(binaryPath, request.configPath);
+  validateConfigInput(configPath);
+  const binaryPath =
+    options.binaryPath ??
+    (await resolveClashSpeedtestPath({
+      ...options.binaryResolverOptions,
+      onProgress: options.onProgress,
+    }));
+  validateBinaryInput(binaryPath);
   const execute = options.execute ?? executeSpeedtest;
   const sites = options.sites ?? DEFAULT_SITES;
   const selectedRegions = REGION_PRESETS.filter((region) => request.regionIds.includes(region.id));
@@ -65,7 +80,9 @@ export async function runLatencyTest(request: RunRequest, options: RunnerOptions
     for (const region of selectedRegions) {
       for (const site of sites) {
         options.onProgress?.(`测试 ${region.label} -> ${site.name}`);
-        const raw = await execute(binaryPath, buildSpeedtestArgs(request.configPath, region, site));
+        const args = buildSpeedtestArgs(configPath, region, site);
+        options.onProgress?.(`运行 ${formatSpeedtestCommand(args)}`);
+        const raw = await execute(binaryPath, args, { onProgress: options.onProgress });
         const rows = normalizeSpeedtestRows(raw, run.id, region, site);
         results.push(...rows);
       }
@@ -83,12 +100,25 @@ export async function runLatencyTest(request: RunRequest, options: RunnerOptions
 }
 
 export function validateRunnableInputs(binaryPath: string, configPath: string) {
+  validateBinaryInput(binaryPath);
+  validateConfigInput(configPath);
+}
+
+export function validateBinaryInput(binaryPath: string) {
   if (!existsSync(binaryPath)) {
-    throw new Error(`找不到内置 clash-speedtest 二进制：${binaryPath}`);
+    throw new Error(`找不到 clash-speedtest 二进制：${binaryPath}`);
   }
-  if (!/^https?:\/\//i.test(configPath) && !existsSync(configPath)) {
-    throw new Error(`找不到 Clash/Mihomo 配置文件：${configPath}`);
+}
+
+export function validateConfigInput(configPath: string) {
+  const normalizedConfigPath = normalizeConfigInput(configPath);
+  if (!/^https?:\/\//i.test(normalizedConfigPath) && !existsSync(normalizedConfigPath)) {
+    throw new Error(`找不到 Clash/Mihomo 配置文件：${normalizedConfigPath}`);
   }
+}
+
+function normalizeConfigInput(configPath: string) {
+  return configPath.trim();
 }
 
 export function normalizeSpeedtestRows(
@@ -124,15 +154,19 @@ export function resolveBundledBinaryPathFrom(cwd: string, moduleDir: string): st
   return found ?? candidates[0];
 }
 
-async function executeSpeedtest(binaryPath: string, args: string[]): Promise<string> {
+export async function executeSpeedtest(
+  binaryPath: string,
+  args: string[],
+  options: ExecuteSpeedtestOptions = {},
+): Promise<string> {
   const proc = Bun.spawn([binaryPath, ...args], {
     stdout: "pipe",
     stderr: "pipe",
   });
 
   const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
+    readTextStream(proc.stdout, options.onProgress),
+    readTextStream(proc.stderr, options.onProgress),
     proc.exited,
   ]);
 
@@ -140,5 +174,50 @@ async function executeSpeedtest(binaryPath: string, args: string[]): Promise<str
   if (exitCode !== 0) {
     throw new Error(`clash-speedtest exited with ${exitCode}: ${combined.trim()}`);
   }
-  return combined;
+  return stdout;
+}
+
+function formatSpeedtestCommand(args: string[]) {
+  return `clash-speedtest ${args.map(quoteCommandArg).join(" ")}`;
+}
+
+function quoteCommandArg(arg: string) {
+  return /^[a-zA-Z0-9_./:=@+-]+$/.test(arg) ? arg : JSON.stringify(arg);
+}
+
+async function readTextStream(stream: ReadableStream<Uint8Array>, onProgress?: (message: string) => void) {
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  let output = "";
+  let bufferedLine = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    const chunk = decoder.decode(value, { stream: true });
+    output += chunk;
+    bufferedLine = emitCompleteLines(bufferedLine + chunk, onProgress);
+  }
+
+  const finalChunk = decoder.decode();
+  if (finalChunk) {
+    output += finalChunk;
+    bufferedLine = emitCompleteLines(bufferedLine + finalChunk, onProgress);
+  }
+  emitProgressLine(bufferedLine, onProgress);
+
+  return output;
+}
+
+function emitCompleteLines(text: string, onProgress?: (message: string) => void) {
+  const lines = text.replaceAll("\r\n", "\n").split("\n");
+  const remainder = lines.pop() ?? "";
+  for (const line of lines) emitProgressLine(line, onProgress);
+  return remainder;
+}
+
+function emitProgressLine(line: string, onProgress?: (message: string) => void) {
+  const trimmed = line.trim();
+  if (trimmed) onProgress?.(`[clash-speedtest] ${trimmed}`);
 }

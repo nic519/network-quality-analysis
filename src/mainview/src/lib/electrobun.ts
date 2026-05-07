@@ -1,16 +1,20 @@
 import { Electroview } from "electrobun/view";
 import { REGION_PRESETS, type HistoryFilters } from "../../../shared/domain";
-import type { AppRPC } from "../../../shared/rpc";
-import type { AppState, ExportCsvResponse, StartRunParams } from "../../../shared/rpc";
+import { APP_RPC_TIMEOUT_MS, type AppRPC } from "../../../shared/rpc";
+import type { AppState, ClashSpeedtestState, ExportCsvResponse, StartRunParams } from "../../../shared/rpc";
 
 export type ProgressHandler = (message: string) => void;
+export type ClashSpeedtestStatusHandler = (state: ClashSpeedtestState) => void;
 
 let progressHandler: ProgressHandler | null = null;
+let clashSpeedtestStatusHandler: ClashSpeedtestStatusHandler | null = null;
 
 const rpc = Electroview.defineRPC<AppRPC>({
+  maxRequestTime: APP_RPC_TIMEOUT_MS,
   handlers: {
     messages: {
       progress: ({ message }) => progressHandler?.(message),
+      clashSpeedtestStatus: (state) => clashSpeedtestStatusHandler?.(state),
     },
   },
 });
@@ -24,6 +28,13 @@ export function onProgress(handler: ProgressHandler) {
   };
 }
 
+export function onClashSpeedtestStatus(handler: ClashSpeedtestStatusHandler) {
+  clashSpeedtestStatusHandler = handler;
+  return () => {
+    if (clashSpeedtestStatusHandler === handler) clashSpeedtestStatusHandler = null;
+  };
+}
+
 const isElectrobun = "__electrobunBunBridge" in window;
 
 export const api = isElectrobun ? electroview.rpc!.request : createPreviewApi();
@@ -31,6 +42,23 @@ export const api = isElectrobun ? electroview.rpc!.request : createPreviewApi();
 function createPreviewApi() {
   const sample: AppState = {
     regions: REGION_PRESETS,
+    configHistory: [
+      {
+        path: "/Users/nicholas/Library/Application Support/mihomo-party/profiles/config.yaml",
+        lastUsedAt: new Date().toISOString(),
+        useCount: 2,
+      },
+    ],
+    clashSpeedtest: {
+      status: "ready",
+      version: "v0.0.1",
+      latestVersion: "v0.0.1",
+      updateAvailable: false,
+      path: "~/Library/Application Support/Latency Compass/bin/clash-speedtest/v0.0.1/clash-speedtest",
+      source: "cache",
+      message: "clash-speedtest 已就绪，当前为最新版本 v0.0.1",
+      checkedAt: new Date().toISOString(),
+    },
     runs: [
       {
         id: "preview-run",

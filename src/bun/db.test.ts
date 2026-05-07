@@ -32,6 +32,30 @@ describe("LatencyDatabase", () => {
 
     db.close();
   });
+
+  test("stores recent config paths by latest successful run", () => {
+    const db = new LatencyDatabase();
+    db.migrate();
+
+    db.saveConfigHistory("/Users/nicholas/configs/old.yaml", "2026-05-07T10:00:00.000Z");
+    db.saveConfigHistory("/Users/nicholas/configs/current.yaml", "2026-05-07T10:01:00.000Z");
+    db.saveConfigHistory("/Users/nicholas/configs/old.yaml", "2026-05-07T10:02:00.000Z");
+
+    expect(db.listConfigHistory()).toEqual([
+      {
+        path: "/Users/nicholas/configs/old.yaml",
+        lastUsedAt: "2026-05-07T10:02:00.000Z",
+        useCount: 2,
+      },
+      {
+        path: "/Users/nicholas/configs/current.yaml",
+        lastUsedAt: "2026-05-07T10:01:00.000Z",
+        useCount: 1,
+      },
+    ]);
+
+    db.close();
+  });
 });
 
 function makeResult(

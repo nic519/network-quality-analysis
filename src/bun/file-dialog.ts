@@ -1,4 +1,5 @@
 import { dirname, isAbsolute } from "node:path";
+import { fileURLToPath } from "node:url";
 
 type OpenFileDialogOptions = {
   startingFolder?: string;
@@ -25,11 +26,17 @@ export async function chooseConfigFile({
     allowsMultipleSelection: false,
   });
 
-  const selectedPath = paths.find((path) => path.trim().length > 0);
+  const selectedPath = paths.map(normalizeSelectedPath).find((path) => path.length > 0);
   return selectedPath ?? null;
 }
 
 function getStartingFolder(currentPath?: string) {
   if (currentPath && isAbsolute(currentPath)) return dirname(currentPath);
   return "~";
+}
+
+function normalizeSelectedPath(path: string) {
+  const trimmed = path.trim();
+  if (!trimmed.startsWith("file://")) return trimmed;
+  return fileURLToPath(trimmed);
 }

@@ -1,10 +1,25 @@
 import type { RPCSchema } from "electrobun/bun";
 import type { HistoryFilters, RegionPreset, ResultRow, RunRecord } from "./domain";
 
+export const APP_RPC_TIMEOUT_MS = 10 * 60 * 1000;
+
 export type AppState = {
   regions: RegionPreset[];
   runs: RunRecord[];
   results: ResultRow[];
+  configHistory: ConfigHistoryItem[];
+  clashSpeedtest: ClashSpeedtestState;
+};
+
+export type ClashSpeedtestState = {
+  status: "missing" | "ready" | "downloading" | "checking-update" | "error";
+  version: string;
+  latestVersion: string | null;
+  updateAvailable: boolean | null;
+  path: string | null;
+  source: "environment" | "cache" | null;
+  message: string;
+  checkedAt: string;
 };
 
 export type StartRunParams = {
@@ -19,6 +34,12 @@ export type ExportCsvResponse = {
 
 export type SelectConfigFileParams = {
   currentPath?: string;
+};
+
+export type ConfigHistoryItem = {
+  path: string;
+  lastUsedAt: string;
+  useCount: number;
 };
 
 export type AppRPC = {
@@ -36,6 +57,7 @@ export type AppRPC = {
   webview: RPCSchema<{
     messages: {
       progress: { message: string };
+      clashSpeedtestStatus: ClashSpeedtestState;
     };
   }>;
 };

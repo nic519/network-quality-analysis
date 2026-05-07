@@ -30,4 +30,12 @@ describe("chooseConfigFile", () => {
 
     expect(selected).toBeNull();
   });
+
+  test("normalizes selected file urls with spaces", async () => {
+    const selected = await chooseConfigFile({
+      openFileDialog: async () => [" file:///Users/nicholas/Library/Application%20Support/mihomo-party/profiles/19536a6d39f.yaml "],
+    });
+
+    expect(selected).toBe("/Users/nicholas/Library/Application Support/mihomo-party/profiles/19536a6d39f.yaml");
+  });
 });

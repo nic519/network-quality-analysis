@@ -1,11 +1,26 @@
-import { Activity, CalendarDays, Download, FileSearch, Gauge, Globe2, Play, Radar, Search, ShieldCheck } from "lucide-react";
+import {
+  Activity,
+  AlertTriangle,
+  CalendarDays,
+  CheckCircle2,
+  Download,
+  FileSearch,
+  Gauge,
+  Globe2,
+  Loader2,
+  PackageCheck,
+  Play,
+  Radar,
+  Search,
+  ShieldCheck,
+} from "lucide-react";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { Badge } from "./components/ui/badge";
 import { Button } from "./components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/ui/card";
 import { Input } from "./components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./components/ui/table";
-import { api, onProgress } from "./lib/electrobun";
+import { api, onClashSpeedtestStatus, onProgress } from "./lib/electrobun";
 import { cn } from "./lib/utils";
 import { DEFAULT_SITES, REGION_PRESETS, latencyStatus, latencyToMs } from "../../shared/domain";
 import type { AppState } from "../../shared/rpc";
@@ -24,8 +39,19 @@ const today = new Date().toISOString().slice(0, 10);
 export default function App() {
   const [state, setState] = useState<AppState>({
     regions: REGION_PRESETS,
+    configHistory: [],
     runs: [],
     results: [],
+    clashSpeedtest: {
+      status: "checking-update",
+      version: "v0.0.1",
+      latestVersion: null,
+      updateAvailable: null,
+      path: null,
+      source: null,
+      message: "正在检查 clash-speedtest 更新",
+      checkedAt: new Date().toISOString(),
+    },
   });
   const [configPath, setConfigPath] = useState("");
   const [selectedRegionIds, setSelectedRegionIds] = useState<string[]>(["hong-kong"]);
@@ -33,6 +59,7 @@ export default function App() {
   const [toDate, setToDate] = useState(today);
   const [search, setSearch] = useState("");
   const [progress, setProgress] = useState("准备就绪");
+  const [progressLog, setProgressLog] = useState<string[]>(["准备就绪"]);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -45,7 +72,23 @@ export default function App() {
     [fromDate, selectedRegionIds, toDate],
   );
 
-  useEffect(() => onProgress(setProgress), []);
+  useEffect(
+    () =>
+      onProgress((message) => {
+        setProgress(message);
+        setProgressLog((current) => [...current.slice(-17), message]);
+      }),
+    [],
+  );
+
+  useEffect(
+    () =>
+      onClashSpeedtestStatus((clashSpeedtest) => {
+        setState((current) => ({ ...current, clashSpeedtest }));
+        setProgress(clashSpeedtest.message);
+      }),
+    [],
+  );
 
   useEffect(() => {
     startTransition(async () => {
@@ -60,20 +103,24 @@ export default function App() {
   const matrixRows = useMemo(() => buildMatrixRows(state.results, search), [search, state.results]);
   const summary = useMemo(() => summarize(state.results), [state.results]);
   const latestRun = state.runs[0];
+  const recentConfigPaths = state.configHistory.filter((item) => item.path !== configPath);
 
   async function startRun() {
     setError(null);
     setProgress("启动测试任务");
+    setProgressLog(["启动测试任务"]);
     try {
       const nextState = await api.startRun({
-        configPath,
+        configPath: configPath.trim(),
         regionIds: selectedRegionIds as Array<"hong-kong" | "japan">,
       });
       setState(nextState);
       setProgress("测试完成");
+      setProgressLog((current) => [...current.slice(-17), "测试完成"]);
     } catch (caught) {
       setError(toErrorMessage(caught));
       setProgress("测试失败");
+      setProgressLog((current) => [...current.slice(-17), `测试失败：${toErrorMessage(caught)}`]);
     }
   }
 
@@ -118,15 +165,21 @@ export default function App() {
                 选择地区和日期，应用会用内置 Filter 跑同一批网站，并把结果存在 SQLite。CSV 只是导出，不再打断结果浏览。
               </p>
             </div>
-            <div className="flex gap-3">
+            <div className="flex flex-col gap-3 lg:items-end">
+              <ClashSpeedtestStatusPanel state={state.clashSpeedtest} />
+              <div className="flex gap-3">
               <Button variant="outline" onClick={exportCsv} disabled={!state.results.length}>
                 <Download className="h-4 w-4" />
                 导出 CSV
               </Button>
-              <Button onClick={startRun} disabled={!configPath || !selectedRegionIds.length || isPending}>
+              <Button
+                onClick={startRun}
+                disabled={!configPath.trim() || !selectedRegionIds.length || isPending || state.clashSpeedtest.status === "downloading"}
+              >
                 <Play className="h-4 w-4" />
                 开始测试
               </Button>
+              </div>
             </div>
           </div>
 
@@ -145,6 +198,22 @@ export default function App() {
                     选择文件
                   </Button>
                 </div>
+                {recentConfigPaths.length ? (
+                  <div className="flex flex-wrap gap-2">
+                    {recentConfigPaths.map((item) => (
+                      <Button
+                        key={item.path}
+                        type="button"
+                        variant="secondary"
+                        className="max-w-[260px] truncate px-3"
+                        title={item.path}
+                        onClick={() => setConfigPath(item.path)}
+                      >
+                        {shortenPath(item.path)}
+                      </Button>
+                    ))}
+                  </div>
+                ) : null}
               </label>
               <div className="space-y-2">
                 <span className="text-sm font-medium text-stone-300">地区预设</span>
@@ -191,6 +260,11 @@ export default function App() {
                 {progress}
                 {error ? <span className="ml-3 text-red-300">{error}</span> : null}
               </CardDescription>
+              <div className="mt-3 max-h-32 overflow-auto rounded-md border border-stone-800 bg-black/25 p-3 font-mono text-xs leading-5 text-stone-400">
+                {progressLog.map((message, index) => (
+                  <div key={`${index}-${message}`}>{message}</div>
+                ))}
+              </div>
             </div>
             <div className="relative w-full lg:w-72">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -245,6 +319,65 @@ export default function App() {
       current.includes(regionId) ? current.filter((id) => id !== regionId) : [...current, regionId],
     );
   }
+}
+
+function ClashSpeedtestStatusPanel({ state }: { state: AppState["clashSpeedtest"] }) {
+  const Icon = getClashSpeedtestStatusIcon(state.status, state.updateAvailable);
+  const label = getClashSpeedtestStatusLabel(state);
+  const detail = state.latestVersion
+    ? `当前 ${state.version} / 最新 ${state.latestVersion}`
+    : `当前 ${state.version} / 最新版本待确认`;
+
+  return (
+    <div className="w-full rounded-lg border border-stone-800 bg-stone-950/75 px-4 py-3 text-left shadow-xl shadow-black/10 lg:w-[390px]">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-sm font-semibold text-stone-100">
+            <Icon
+              className={cn(
+                "h-4 w-4 shrink-0",
+                state.status === "downloading" || state.status === "checking-update" ? "animate-spin text-sky-300" : "",
+                state.status === "ready" && !state.updateAvailable ? "text-emerald-300" : "",
+                state.updateAvailable ? "text-amber-300" : "",
+                state.status === "missing" || state.status === "error" ? "text-red-300" : "",
+              )}
+            />
+            <span>{label}</span>
+          </div>
+          <div className="mt-1 text-xs text-stone-400">{detail}</div>
+          <div className="mt-2 truncate text-xs text-stone-500" title={state.path ?? state.message}>
+            {state.path ? shortenPath(state.path) : state.message}
+          </div>
+        </div>
+        <Badge variant="outline" className={cn("shrink-0", getClashSpeedtestBadgeClass(state))}>
+          {state.updateAvailable ? "有更新" : state.status === "missing" ? "待下载" : state.status === "ready" ? "就绪" : "检查中"}
+        </Badge>
+      </div>
+    </div>
+  );
+}
+
+function getClashSpeedtestStatusIcon(status: AppState["clashSpeedtest"]["status"], updateAvailable: boolean | null) {
+  if (status === "downloading" || status === "checking-update") return Loader2;
+  if (status === "ready" && updateAvailable) return PackageCheck;
+  if (status === "ready") return CheckCircle2;
+  return AlertTriangle;
+}
+
+function getClashSpeedtestStatusLabel(state: AppState["clashSpeedtest"]) {
+  if (state.status === "downloading") return "clash-speedtest 下载中";
+  if (state.status === "checking-update") return "clash-speedtest 检查中";
+  if (state.status === "missing") return "clash-speedtest 未下载";
+  if (state.status === "error") return "clash-speedtest 状态异常";
+  if (state.updateAvailable) return "clash-speedtest 已就绪，有更新";
+  return "clash-speedtest 已就绪";
+}
+
+function getClashSpeedtestBadgeClass(state: AppState["clashSpeedtest"]) {
+  if (state.updateAvailable) return "border-amber-500/40 bg-amber-500/10 text-amber-200";
+  if (state.status === "ready") return "border-emerald-500/40 bg-emerald-500/10 text-emerald-200";
+  if (state.status === "downloading" || state.status === "checking-update") return "border-sky-500/40 bg-sky-500/10 text-sky-200";
+  return "border-red-500/40 bg-red-500/10 text-red-200";
 }
 
 function MetricCard({
@@ -349,6 +482,12 @@ function formatDate(value: string) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(value));
+}
+
+function shortenPath(path: string) {
+  const parts = path.split("/");
+  if (parts.length <= 3) return path;
+  return `${parts.at(-2)}/${parts.at(-1)}`;
 }
 
 function toErrorMessage(error: unknown) {

@@ -1,5 +1,6 @@
 import { Database } from "bun:sqlite";
 import type { HistoryFilters, ResultRow, RunRecord } from "../shared/domain";
+import type { ConfigHistoryItem } from "../shared/rpc";
 
 type RunRow = {
   id: string;
@@ -26,6 +27,12 @@ type ResultDbRow = {
   packet_loss: string;
   download_speed: string;
   upload_speed: string;
+};
+
+type ConfigHistoryRow = {
+  path: string;
+  last_used_at: string;
+  use_count: number;
 };
 
 export class LatencyDatabase {
@@ -70,6 +77,14 @@ export class LatencyDatabase {
       CREATE INDEX IF NOT EXISTS idx_results_region ON results(region_id);
       CREATE INDEX IF NOT EXISTS idx_results_proxy_id ON results(proxy_id);
       CREATE INDEX IF NOT EXISTS idx_runs_started_at ON runs(started_at);
+
+      CREATE TABLE IF NOT EXISTS config_history (
+        path TEXT PRIMARY KEY,
+        last_used_at TEXT NOT NULL,
+        use_count INTEGER NOT NULL DEFAULT 1
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_config_history_last_used_at ON config_history(last_used_at);
     `);
     this.addColumnIfMissing("results", "proxy_id", "TEXT NOT NULL DEFAULT ''");
   }
@@ -160,6 +175,41 @@ export class LatencyDatabase {
     });
 
     transaction(rows);
+  }
+
+  saveConfigHistory(path: string, lastUsedAt = new Date().toISOString()) {
+    const normalizedPath = path.trim();
+    if (!normalizedPath) return;
+
+    this.db
+      .query(`
+        INSERT INTO config_history (path, last_used_at, use_count)
+        VALUES ($path, $lastUsedAt, 1)
+        ON CONFLICT(path) DO UPDATE SET
+          last_used_at = excluded.last_used_at,
+          use_count = config_history.use_count + 1
+      `)
+      .run({
+        $path: normalizedPath,
+        $lastUsedAt: lastUsedAt,
+      });
+  }
+
+  listConfigHistory(limit = 6): ConfigHistoryItem[] {
+    const rows = this.db
+      .query<ConfigHistoryRow, { $limit: number }>(`
+        SELECT path, last_used_at, use_count
+        FROM config_history
+        ORDER BY last_used_at DESC
+        LIMIT $limit
+      `)
+      .all({ $limit: limit });
+
+    return rows.map((row) => ({
+      path: row.path,
+      lastUsedAt: row.last_used_at,
+      useCount: row.use_count,
+    }));
   }
 
   listRuns(): RunRecord[] {
