@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef, useState } from "react";
 import { Circle, CircleDot, Copy, Download, Search } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Badge } from "./ui/badge";
@@ -255,47 +256,11 @@ export function AnalysisView({
 
                 <section className="mt-6">
                   <div className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">Failures</div>
-                  <div className="mt-3 rounded-[22px] border border-stone-900 bg-stone-950/70 p-4">
-                    <div className="mb-3 text-sm font-medium text-stone-100">测试失败记录</div>
-                    {failedSiteRows.length ? (
-                      <div className="custom-scrollbar max-h-[260px] overflow-auto rounded-2xl border border-stone-800 bg-black/20">
-                        <Table>
-                          <TableHeader className="[&_tr]:border-stone-800">
-                            <TableRow className="hover:bg-transparent">
-                              <TableHead className="h-10 px-3 text-[11px] uppercase tracking-[0.16em] text-stone-500">节点</TableHead>
-                              <TableHead className="h-10 px-3 text-[11px] uppercase tracking-[0.16em] text-stone-500">失败网站</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody className="[&_tr:last-child]:border-stone-800">
-                            {failedSiteRows.map((row) => (
-                              <TableRow key={row.key} className="border-stone-800 hover:bg-stone-900/40">
-                                <TableCell className="px-3 py-2.5">
-                                  <div className="truncate text-sm text-stone-100">
-                                    <span className="font-medium">{row.proxyName}</span>
-                                    <span className="mx-2 text-stone-600">·</span>
-                                    <span className="text-xs text-stone-500">
-                                      {row.proxyType} / {row.regionLabel}
-                                    </span>
-                                  </div>
-                                </TableCell>
-                                <TableCell className="px-3 py-2.5">
-                                  <div className="flex flex-wrap gap-1.5">
-                                    {row.failedSites.map((siteName) => (
-                                      <Badge key={`${row.key}-${siteName}`} variant="outline" className="border-stone-700 bg-stone-900/80 text-stone-300">
-                                        {siteName}
-                                      </Badge>
-                                    ))}
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    ) : (
-                      <div className="text-sm leading-6 text-stone-500">当前批次或时间范围内没有失败记录。</div>
-                    )}
-                  </div>
+                  {failedSiteRows.length ? (
+                    <FailureTable rows={failedSiteRows} />
+                  ) : (
+                    <div className="mt-3 text-sm leading-6 text-stone-500">当前批次或时间范围内没有失败记录。</div>
+                  )}
                 </section>
               </section>
             </div>
@@ -303,6 +268,143 @@ export function AnalysisView({
         </div>
       </div>
     </section>
+  );
+}
+
+function FailureTable({ rows }: { rows: ReturnType<typeof buildFailedSiteRows> }) {
+  const scrollAreaRef = useRef<HTMLDivElement | null>(null);
+  const thumbRef = useRef<HTMLDivElement | null>(null);
+  const dragStateRef = useRef<{ pointerId: number; startY: number; startScrollTop: number } | null>(null);
+  const [scrollState, setScrollState] = useState({ canScroll: false, thumbTop: 0, thumbHeight: 100 });
+
+  const updateScrollState = () => {
+    const scrollArea = scrollAreaRef.current;
+    if (!scrollArea) return;
+
+    const { clientHeight, scrollHeight, scrollTop } = scrollArea;
+    const canScroll = scrollHeight > clientHeight + 1;
+    const thumbHeight = canScroll ? Math.max(34, (clientHeight / scrollHeight) * 100) : 100;
+    const maxThumbTop = 100 - thumbHeight;
+    const thumbTop = canScroll ? (scrollTop / (scrollHeight - clientHeight)) * maxThumbTop : 0;
+
+    setScrollState({ canScroll, thumbTop, thumbHeight });
+  };
+
+  useLayoutEffect(() => {
+    updateScrollState();
+    const scrollArea = scrollAreaRef.current;
+    if (!scrollArea) return;
+
+    const resizeObserver = new ResizeObserver(updateScrollState);
+    resizeObserver.observe(scrollArea);
+    resizeObserver.observe(scrollArea.firstElementChild ?? scrollArea);
+
+    return () => resizeObserver.disconnect();
+  }, [rows]);
+
+  const scrollToTrackPosition = (clientY: number) => {
+    const scrollArea = scrollAreaRef.current;
+    const track = thumbRef.current?.parentElement;
+    if (!scrollArea || !track) return;
+
+    const trackRect = track.getBoundingClientRect();
+    const targetRatio =
+      (clientY - trackRect.top - trackRect.height * (scrollState.thumbHeight / 100) * 0.5) / trackRect.height;
+    scrollArea.scrollTop = targetRatio * scrollArea.scrollHeight;
+    updateScrollState();
+  };
+
+  return (
+    <div className="relative mt-3 rounded-2xl border border-stone-800 bg-black/20">
+      <div ref={scrollAreaRef} className="terminal-log-scroll-area max-h-[260px] overflow-auto pr-7" onScroll={updateScrollState}>
+        <Table>
+          <TableHeader className="sticky top-0 z-10 bg-stone-950/95 backdrop-blur [&_tr]:border-stone-800">
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="h-10 px-3 text-[11px] uppercase tracking-[0.16em] text-stone-500">节点</TableHead>
+              <TableHead className="h-10 px-3 text-[11px] uppercase tracking-[0.16em] text-stone-500">失败网站</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody className="[&_tr:last-child]:border-stone-800">
+            {rows.map((row) => (
+              <TableRow key={row.key} className="border-stone-800 hover:bg-stone-900/40">
+                <TableCell className="px-3 py-2.5">
+                  <div className="truncate text-sm text-stone-100">
+                    <span className="font-medium">{row.proxyName}</span>
+                    <span className="mx-2 text-stone-600">·</span>
+                    <span className="text-xs text-stone-500">
+                      {row.proxyType} / {row.regionLabel}
+                    </span>
+                  </div>
+                </TableCell>
+                <TableCell className="px-3 py-2.5">
+                  <div className="flex flex-wrap gap-1.5">
+                    {row.failedSites.map((siteName) => (
+                      <Badge key={`${row.key}-${siteName}`} variant="outline" className="border-stone-700 bg-stone-900/80 text-stone-300">
+                        {siteName}
+                      </Badge>
+                    ))}
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+
+      {scrollState.canScroll ? (
+        <div
+          aria-hidden="true"
+          className="absolute bottom-3 right-2 top-3 w-2 rounded-full bg-stone-900/80 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]"
+          onPointerDown={(event) => scrollToTrackPosition(event.clientY)}
+        >
+          <div
+            ref={thumbRef}
+            className="absolute left-0 w-full rounded-full bg-emerald-300/45 shadow-[inset_0_0_0_1px_rgba(209,250,229,0.18)] transition-colors hover:bg-emerald-200/60"
+            style={{
+              height: `${scrollState.thumbHeight}%`,
+              top: `${scrollState.thumbTop}%`,
+            }}
+            onPointerDown={(event) => {
+              const scrollArea = scrollAreaRef.current;
+              if (!scrollArea) return;
+
+              event.stopPropagation();
+              thumbRef.current?.setPointerCapture(event.pointerId);
+              dragStateRef.current = {
+                pointerId: event.pointerId,
+                startY: event.clientY,
+                startScrollTop: scrollArea.scrollTop,
+              };
+            }}
+            onPointerMove={(event) => {
+              const scrollArea = scrollAreaRef.current;
+              const track = thumbRef.current?.parentElement;
+              const dragState = dragStateRef.current;
+              if (!scrollArea || !track || !dragState || dragState.pointerId !== event.pointerId) return;
+
+              const trackHeight = track.getBoundingClientRect().height;
+              const availableTrack = trackHeight * (1 - scrollState.thumbHeight / 100);
+              const availableScroll = scrollArea.scrollHeight - scrollArea.clientHeight;
+              const scrollPerPixel = availableTrack > 0 ? availableScroll / availableTrack : 0;
+              scrollArea.scrollTop = dragState.startScrollTop + (event.clientY - dragState.startY) * scrollPerPixel;
+              updateScrollState();
+            }}
+            onPointerUp={(event) => {
+              if (dragStateRef.current?.pointerId === event.pointerId) {
+                dragStateRef.current = null;
+                thumbRef.current?.releasePointerCapture(event.pointerId);
+              }
+            }}
+            onPointerCancel={(event) => {
+              if (dragStateRef.current?.pointerId === event.pointerId) {
+                dragStateRef.current = null;
+                thumbRef.current?.releasePointerCapture(event.pointerId);
+              }
+            }}
+          />
+        </div>
+      ) : null}
+    </div>
   );
 }
 
