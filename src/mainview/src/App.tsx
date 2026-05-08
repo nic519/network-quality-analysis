@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { TopNavigation, type AppView } from "./components/top-navigation";
 import { RunSetupView } from "./components/run-setup-view";
 import { AnalysisView } from "./components/analysis-view";
@@ -40,7 +40,9 @@ export default function App() {
   const [progress, setProgress] = useState("准备就绪");
   const [progressLog, setProgressLog] = useState<string[]>(["准备就绪"]);
   const [error, setError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [isRunPending, setIsRunPending] = useState(false);
+  const isRunInFlightRef = useRef(false);
+  const [, startTransition] = useTransition();
 
   const filters = useMemo(
     () => ({
@@ -84,6 +86,10 @@ export default function App() {
   const diagnosticsHint = getDiagnosticsHint(state.clashSpeedtest);
 
   async function startRun() {
+    if (isRunInFlightRef.current) return;
+
+    isRunInFlightRef.current = true;
+    setIsRunPending(true);
     setError(null);
     setProgress("启动测试任务");
     setProgressLog(["启动测试任务"]);
@@ -101,6 +107,9 @@ export default function App() {
       setError(toErrorMessage(caught));
       setProgress("测试失败");
       setProgressLog((current) => [...current.slice(-17), `测试失败：${toErrorMessage(caught)}`]);
+    } finally {
+      isRunInFlightRef.current = false;
+      setIsRunPending(false);
     }
   }
 
@@ -205,7 +214,7 @@ export default function App() {
           progressLog={progressLog}
           error={error}
           onStartRun={startRun}
-          isPending={isPending}
+          isPending={isRunPending}
           diagnosticsHint={diagnosticsHint}
           onOpenDiagnostics={() => setActiveView("diagnostics")}
         />
@@ -224,7 +233,6 @@ export default function App() {
           onSearchChange={setSearch}
           selectedSiteId={selectedSiteId}
           onSelectedSiteIdChange={setSelectedSiteId}
-          progress={progress}
           error={error}
           onCopyResults={copyResults}
           onExportAllResults={exportAllResults}

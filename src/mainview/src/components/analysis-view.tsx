@@ -1,4 +1,4 @@
-import { Activity, Circle, CircleDot, Copy, Download, Search } from "lucide-react";
+import { Circle, CircleDot, Copy, Download, Search } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
@@ -22,7 +22,6 @@ export function AnalysisView({
   onSearchChange,
   selectedSiteId,
   onSelectedSiteIdChange,
-  progress,
   error,
   onCopyResults,
   onExportAllResults,
@@ -38,13 +37,11 @@ export function AnalysisView({
   onSearchChange: (value: string) => void;
   selectedSiteId: string;
   onSelectedSiteIdChange: (value: string) => void;
-  progress: string;
   error: string | null;
   onCopyResults: () => void;
   onExportAllResults: () => void;
 }) {
   const selectedSite = DEFAULT_SITES.find((site) => site.id === selectedSiteId) ?? DEFAULT_SITES[0];
-  const selectedRun = state.runs.find((run) => run.id === selectedRunId) ?? null;
   const runItems = state.runs.slice(0, 12);
   const scopedResults = filterScopedResults(state.results, selectedRunId);
   const chartRows = buildRunScopedChartRows(scopedResults, search, selectedSite?.name);
@@ -201,16 +198,6 @@ export function AnalysisView({
 
             <div className="grid gap-0">
               <section className="min-w-0 border-b border-stone-900 px-6 py-6">
-                <div className="mb-4 flex items-center justify-between gap-4">
-                  <div className="text-sm text-stone-400">
-                    {selectedRun ? `当前批次 · ${formatDate(selectedRun.startedAt)}` : progress}
-                  </div>
-                  <div className="flex items-center gap-2 rounded-full border border-stone-800 bg-stone-950/80 px-3 py-2 text-xs text-stone-400">
-                    <Activity className="h-3.5 w-3.5 text-emerald-300" />
-                    <span>{selectedSite?.name}</span>
-                  </div>
-                </div>
-
                 <div className="h-[420px] rounded-[24px] border border-stone-900 bg-black/20 px-3 py-3">
                   {availableChartRows.length ? (
                     <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} initialDimension={{ width: 800, height: 420 }}>

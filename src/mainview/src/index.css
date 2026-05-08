@@ -65,3 +65,14 @@ input {
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(180deg, rgba(167, 243, 208, 0.62), rgba(52, 211, 153, 0.44));
 }
+
+.terminal-log-scroll-area {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.terminal-log-scroll-area::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
