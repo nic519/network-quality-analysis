@@ -38,7 +38,6 @@ export function RunSetupView({
   diagnosticsHint: string | null;
   onOpenDiagnostics: () => void;
 }) {
-  const isConfigUrl = /^https?:\/\//i.test(configPath.trim());
   const isRunDisabled =
     !configPath.trim() || !selectedRegionIds.length || isPending || state.clashSpeedtest.status === "downloading";
 
@@ -50,12 +49,12 @@ export function RunSetupView({
             <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
               <div className="grid content-start gap-3">
                 <label className="grid gap-1.5">
-                  <span className="text-xs font-medium text-stone-400">yaml 地址</span>
+                  <span className="text-xs font-medium text-stone-400">yaml 地址或 URL</span>
                   <div className="flex gap-2">
                     <Input
-                      value={isConfigUrl ? "" : configPath}
+                      value={configPath}
                       onChange={(event) => onConfigPathChange(event.target.value)}
-                      placeholder="/Users/nicholas/Library/Application Support/mihomo-party/profiles/config.yaml"
+                      placeholder="/Users/nicholas/.../config.yaml 或 https://example.com/subscription.yaml"
                       className="h-10"
                     />
                     <Button type="button" variant="outline" onClick={onSelectConfigFile} className="h-10 shrink-0 px-3">
@@ -64,11 +63,13 @@ export function RunSetupView({
                     </Button>
                   </div>
                 </label>
+              </div>
 
-                {recentConfigPaths.length ? (
-                  <div className="flex min-w-0 items-center gap-2">
-                    <span className="shrink-0 text-xs font-medium text-stone-500">读取预设</span>
-                    <div className="custom-scrollbar flex min-w-0 flex-1 flex-nowrap gap-2 overflow-x-auto pb-1">
+              <div className="grid content-start gap-3">
+                <div className="grid gap-1.5">
+                  <span className="text-xs font-medium text-stone-400">读取预设</span>
+                  {recentConfigPaths.length ? (
+                    <div className="custom-scrollbar flex min-w-0 flex-nowrap gap-2 overflow-x-auto pb-1">
                       {recentConfigPaths.map((item) => (
                         <Button
                           key={item.path}
@@ -82,36 +83,10 @@ export function RunSetupView({
                         </Button>
                       ))}
                     </div>
-                  </div>
-                ) : null}
-
-                <Button
-                  onClick={onStartRun}
-                  disabled={isRunDisabled}
-                  aria-busy={isPending}
-                  className="mt-1 h-14 rounded-lg bg-gradient-to-r from-emerald-300 via-lime-300 to-amber-300 px-5 text-base font-black text-stone-950 shadow-[0_0_28px_rgba(132,204,22,0.35)] transition hover:scale-[1.01] hover:from-emerald-200 hover:via-lime-200 hover:to-amber-200 disabled:hover:scale-100"
-                >
-                  {isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Play className="h-5 w-5 fill-current" />}
-                  {isPending ? "测试中..." : "开始测试"}
-                </Button>
-
-                <div className="flex min-w-0 items-baseline gap-2 text-sm">
-                  <span className="shrink-0 text-xs font-medium text-stone-500">运行状态</span>
-                  <span className="min-w-0 truncate text-stone-300">{progress}</span>
-                  {error ? <span className="shrink-0 text-red-300">{error}</span> : null}
+                  ) : (
+                    <span className="text-sm text-stone-600">暂无历史地址</span>
+                  )}
                 </div>
-              </div>
-
-              <div className="grid content-start gap-3">
-                <label className="grid gap-1.5">
-                  <span className="text-xs font-medium text-stone-400">输入 URL</span>
-                  <Input
-                    value={isConfigUrl ? configPath : ""}
-                    onChange={(event) => onConfigPathChange(event.target.value)}
-                    placeholder="https://example.com/subscription.yaml"
-                    className="h-10"
-                  />
-                </label>
 
                 <div className="space-y-2">
                   <div className="flex items-center justify-between gap-3">
@@ -171,12 +146,32 @@ export function RunSetupView({
         </Card>
 
         <Card className="rounded-lg border-stone-800 bg-stone-950/80">
-          <CardContent className="p-3">
-            <div className="mb-2 flex items-center justify-between px-1">
-              <span className="text-xs font-medium text-stone-500">日志</span>
-              <span className="text-xs text-stone-600">{progressLog.length} 条</span>
+          <CardContent className="grid gap-4 p-3 lg:grid-cols-[1fr_2fr]">
+            <div className="grid content-start gap-3 p-1">
+              <Button
+                onClick={onStartRun}
+                disabled={isRunDisabled}
+                aria-busy={isPending}
+                className="h-16 rounded-lg bg-gradient-to-r from-emerald-300 via-lime-300 to-amber-300 px-5 text-base font-black text-stone-950 shadow-[0_0_28px_rgba(132,204,22,0.35)] transition hover:scale-[1.01] hover:from-emerald-200 hover:via-lime-200 hover:to-amber-200 disabled:hover:scale-100"
+              >
+                {isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Play className="h-5 w-5 fill-current" />}
+                {isPending ? "测试中..." : "开始测试"}
+              </Button>
+
+              <div className="grid gap-1 text-sm">
+                <span className="text-xs font-medium text-stone-500">运行状态</span>
+                <span className="min-w-0 break-words text-stone-300">{progress}</span>
+                {error ? <span className="break-words text-red-300">{error}</span> : null}
+              </div>
             </div>
-            <TerminalLog messages={progressLog} />
+
+            <div className="min-w-0">
+              <div className="mb-2 flex items-center justify-between px-1">
+                <span className="text-xs font-medium text-stone-500">日志</span>
+                <span className="text-xs text-stone-600">{progressLog.length} 条</span>
+              </div>
+              <TerminalLog messages={progressLog} />
+            </div>
           </CardContent>
         </Card>
       </div>
