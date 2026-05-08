@@ -28,6 +28,7 @@ export type RunnerOptions = {
 
 export type RunOutput = {
   run: RunRecord;
+  runs: RunRecord[];
   results: ResultRow[];
 };
 
@@ -53,15 +54,6 @@ export function buildSpeedtestArgs(configPath: string, region: RegionPreset, sit
 export async function runLatencyTest(request: RunRequest, options: RunnerOptions = {}): Promise<RunOutput> {
   const configPath = normalizeConfigInput(request.configPath);
   const now = options.now ?? (() => new Date());
-  const startedAt = now();
-  const run: RunRecord = {
-    id: createRunId(startedAt),
-    startedAt: startedAt.toISOString(),
-    completedAt: null,
-    status: "running",
-    selectedRegions: request.regionIds,
-    errorMessage: null,
-  };
 
   validateConfigInput(configPath);
   const binaryPath =
@@ -73,28 +65,38 @@ export async function runLatencyTest(request: RunRequest, options: RunnerOptions
   const execute = options.execute ?? executeSpeedtest;
   const sites = options.sites ?? DEFAULT_SITES;
   const selectedRegions = REGION_PRESETS.filter((region) => request.regionIds.includes(region.id));
+  const runs: RunRecord[] = [];
   const results: ResultRow[] = [];
+  let activeRun: RunRecord | null = null;
 
   try {
     for (const region of selectedRegions) {
+      activeRun = createRegionRun(now(), region);
+      runs.push(activeRun);
+
       for (const site of sites) {
         options.onProgress?.(`测试 ${region.label} -> ${site.name}`);
         const args = buildSpeedtestArgs(configPath, region, site);
         options.onProgress?.(`运行 ${formatSpeedtestCommand(args)}`);
         const raw = await execute(binaryPath, args, { onProgress: options.onProgress });
-        const rows = normalizeSpeedtestRows(raw, run.id, region, site);
+        const rows = normalizeSpeedtestRows(raw, activeRun.id, region, site);
         results.push(...rows);
       }
+
+      activeRun.status = "completed";
+      activeRun.completedAt = now().toISOString();
     }
 
-    run.status = "completed";
-    run.completedAt = now().toISOString();
-    return { run, results };
+    const run = runs[0] ?? createEmptyRun(now(), request.regionIds);
+    return { run, runs, results };
   } catch (error) {
-    run.status = "failed";
-    run.completedAt = now().toISOString();
-    run.errorMessage = error instanceof Error ? error.message : String(error);
-    throw Object.assign(error instanceof Error ? error : new Error(String(error)), { run, results });
+    if (activeRun) {
+      activeRun.status = "failed";
+      activeRun.completedAt = now().toISOString();
+      activeRun.errorMessage = error instanceof Error ? error.message : String(error);
+    }
+    const run = activeRun ?? runs[0] ?? createEmptyRun(now(), request.regionIds);
+    throw Object.assign(error instanceof Error ? error : new Error(String(error)), { run, runs, results });
   }
 }
 
@@ -129,6 +131,28 @@ export function validateConfigInput(configPath: string) {
 
 function normalizeConfigInput(configPath: string) {
   return configPath.trim();
+}
+
+function createRegionRun(startedAt: Date, region: RegionPreset): RunRecord {
+  return {
+    id: `${createRunId(startedAt)}-${region.id}`,
+    startedAt: startedAt.toISOString(),
+    completedAt: null,
+    status: "running",
+    selectedRegions: [region.id],
+    errorMessage: null,
+  };
+}
+
+function createEmptyRun(startedAt: Date, selectedRegions: RegionPreset["id"][]): RunRecord {
+  return {
+    id: createRunId(startedAt),
+    startedAt: startedAt.toISOString(),
+    completedAt: null,
+    status: "completed",
+    selectedRegions,
+    errorMessage: null,
+  };
 }
 
 export function normalizeSpeedtestRows(

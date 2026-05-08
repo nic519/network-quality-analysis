@@ -107,12 +107,12 @@ const rpc = BrowserView.defineRPC<AppRPC>({
             },
           );
 
-          db.saveRun(output.run);
+          for (const run of output.runs) db.saveRun(run);
           db.saveResults(output.results);
           db.saveConfigHistory(configPath, output.run.completedAt ?? output.run.startedAt);
           clashSpeedtestState = await getClashSpeedtestState({ envPath: manualClashSpeedtestPath ?? undefined });
           publishClashSpeedtestState(clashSpeedtestState);
-          return getAppState({ runId: output.run.id });
+          return getAppState(output.runs.length === 1 ? { runId: output.run.id } : {});
         } catch (error) {
           publishClashSpeedtestState(
             makeClashSpeedtestState({

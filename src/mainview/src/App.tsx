@@ -97,7 +97,7 @@ export default function App() {
         regionIds: selectedRegionIds as RegionPreset["id"][],
       });
       setState(nextState);
-      setSelectedRunId(nextState.runs[0]?.id ?? "all");
+      setSelectedRunId(selectedRegionIds.length > 1 ? "all" : nextState.runs[0]?.id ?? "all");
       setProgress("测试完成");
       setProgressLog((current) => [...current.slice(-17), "测试完成"]);
       setActiveView("analysis");

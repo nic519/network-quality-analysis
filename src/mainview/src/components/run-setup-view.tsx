@@ -63,9 +63,6 @@ export function RunSetupView({
                     </Button>
                   </div>
                 </label>
-              </div>
-
-              <div className="grid content-start gap-3">
                 <div className="grid gap-1.5">
                   <span className="text-xs font-medium text-stone-400">读取预设</span>
                   {recentConfigPaths.length ? (
@@ -87,7 +84,9 @@ export function RunSetupView({
                     <span className="text-sm text-stone-600">暂无历史地址</span>
                   )}
                 </div>
+              </div>
 
+              <div className="grid content-start gap-3">
                 <div className="space-y-2">
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-xs font-medium text-stone-400">地区预设</span>
@@ -159,17 +158,12 @@ export function RunSetupView({
               </Button>
 
               <div className="grid gap-1 text-sm">
-                <span className="text-xs font-medium text-stone-500">运行状态</span>
                 <span className="min-w-0 break-words text-stone-300">{progress}</span>
                 {error ? <span className="break-words text-red-300">{error}</span> : null}
               </div>
             </div>
 
             <div className="min-w-0">
-              <div className="mb-2 flex items-center justify-between px-1">
-                <span className="text-xs font-medium text-stone-500">日志</span>
-                <span className="text-xs text-stone-600">{progressLog.length} 条</span>
-              </div>
               <TerminalLog messages={progressLog} />
             </div>
           </CardContent>

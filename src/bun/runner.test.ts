@@ -91,6 +91,44 @@ describe("runLatencyTest", () => {
     expect(output.results).toHaveLength(1);
   });
 
+  test("creates one completed run per selected region", async () => {
+    const root = join(tmpdir(), `latency-runner-regions-${Date.now()}`);
+    const binaryPath = join(root, "clash-speedtest");
+    const configPath = join(root, "config.yaml");
+    mkdirSync(root, { recursive: true });
+    writeFileSync(binaryPath, "");
+    writeFileSync(configPath, "");
+
+    const output = await runLatencyTest(
+      {
+        configPath,
+        regionIds: ["hong-kong", "japan"],
+      },
+      {
+        binaryPath,
+        sites: [site],
+        now: () => new Date("2026-05-07T10:00:00.000Z"),
+        execute: async (_binary, args) => {
+          const filterIndex = args.indexOf("-f");
+          const filterRegex = args[filterIndex + 1];
+          const proxyName = filterRegex === REGION_PRESETS[0].filterRegex ? "HK-01" : "JP-01";
+          return `序号\t节点名称\t类型\t延迟\n1.\t${proxyName}\tTrojan\t128ms\n`;
+        },
+      },
+    );
+
+    expect(output.runs.map((run) => run.selectedRegions)).toEqual([["hong-kong"], ["japan"]]);
+    expect(output.runs.every((run) => run.status === "completed")).toBe(true);
+    expect(output.runs.map((run) => run.id)).toEqual([
+      "run-20260507T100000Z-hong-kong",
+      "run-20260507T100000Z-japan",
+    ]);
+    expect(output.results.map((row) => [row.runId, row.regionId, row.proxyName])).toEqual([
+      ["run-20260507T100000Z-hong-kong", "hong-kong", "HK-01"],
+      ["run-20260507T100000Z-japan", "japan", "JP-01"],
+    ]);
+  });
+
   test("resolves clash-speedtest from a go install location when no binary path is provided", async () => {
     const root = join(tmpdir(), `latency-runner-gobin-${Date.now()}`);
     const binaryPath = join(root, "clash-speedtest");
