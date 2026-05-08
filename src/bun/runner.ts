@@ -104,18 +104,19 @@ export function validateRunnableInputs(binaryPath: string, configPath: string) {
 }
 
 export function validateBinaryInput(binaryPath: string) {
-  if (!existsSync(binaryPath)) {
-    throw new Error(`找不到 clash-speedtest 二进制：${binaryPath}`);
-  }
-
-  const normalizedPath = binaryPath.trim().toLowerCase();
-  if (normalizedPath.endsWith(".tar.gz") || normalizedPath.endsWith(".tgz") || normalizedPath.endsWith(".zip")) {
+  const normalizedPath = binaryPath.trim();
+  const lowerPath = normalizedPath.toLowerCase();
+  if (lowerPath.endsWith(".tar.gz") || lowerPath.endsWith(".tgz") || lowerPath.endsWith(".zip")) {
     throw new Error("请选择解压后的 clash-speedtest 可执行文件，不要直接选择压缩包");
   }
 
-  const stats = statSync(binaryPath);
+  if (!existsSync(normalizedPath)) {
+    throw new Error(`找不到 clash-speedtest 二进制：${normalizedPath}`);
+  }
+
+  const stats = statSync(normalizedPath);
   if (!stats.isFile()) {
-    throw new Error(`请选择 clash-speedtest 可执行文件，当前不是文件：${binaryPath}`);
+    throw new Error(`请选择 clash-speedtest 可执行文件，当前不是文件：${normalizedPath}`);
   }
 }
 

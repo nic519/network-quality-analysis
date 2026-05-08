@@ -1,5 +1,5 @@
 import { Electroview } from "electrobun/view";
-import { REGION_PRESETS, type HistoryFilters } from "../../../shared/domain";
+import { REGION_PRESETS, type HistoryFilters, type RegionPreset } from "../../../shared/domain";
 import { APP_RPC_TIMEOUT_MS, type AppRPC } from "../../../shared/rpc";
 import type {
   AppState,
@@ -141,7 +141,7 @@ function createPreviewApi() {
 
 function makePreviewResult(
   runId: string,
-  regionId: "hong-kong" | "japan",
+  regionId: RegionPreset["id"],
   regionLabel: string,
   proxyName: string,
   proxyType: string,

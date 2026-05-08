@@ -4,8 +4,11 @@ import { RunSetupView } from "./components/run-setup-view";
 import { AnalysisView } from "./components/analysis-view";
 import { DiagnosticsView } from "./components/diagnostics-view";
 import type { MatrixRow } from "./lib/chart-data";
+import { buildCopyResultsText } from "./lib/copy-results-text";
 import { api, onClashSpeedtestStatus, onProgress } from "./lib/electrobun";
+import { buildAnalysisHistoryFilters } from "./lib/history-filters";
 import { DEFAULT_SITES, REGION_PRESETS, latencyToMs } from "../../shared/domain";
+import type { RegionPreset } from "../../shared/domain";
 import type { AppState } from "../../shared/rpc";
 
 const today = new Date().toISOString().slice(0, 10);
@@ -45,13 +48,8 @@ export default function App() {
   const [, startTransition] = useTransition();
 
   const filters = useMemo(
-    () => ({
-      runId: selectedRunId === "all" ? undefined : selectedRunId,
-      regionIds: selectedRegionIds,
-      fromDate: selectedRunId === "all" ? `${fromDate}T00:00:00.000Z` : undefined,
-      toDate: selectedRunId === "all" ? `${toDate}T23:59:59.999Z` : undefined,
-    }),
-    [fromDate, selectedRegionIds, selectedRunId, toDate],
+    () => buildAnalysisHistoryFilters({ selectedRunId, fromDate, toDate }),
+    [fromDate, selectedRunId, toDate],
   );
 
   useEffect(
@@ -96,7 +94,7 @@ export default function App() {
     try {
       const nextState = await api.startRun({
         configPath: configPath.trim(),
-        regionIds: selectedRegionIds as Array<"hong-kong" | "japan">,
+        regionIds: selectedRegionIds as RegionPreset["id"][],
       });
       setState(nextState);
       setSelectedRunId(nextState.runs[0]?.id ?? "all");
@@ -117,10 +115,10 @@ export default function App() {
     setError(null);
     try {
       const rows = buildMatrixRows(state.results, search);
-      const csv = buildCsvText(rows);
+      const csv = buildCopyResultsText(rows);
       await navigator.clipboard.writeText(csv);
       if (csv) {
-        setProgress("已复制结果 CSV 到剪贴板");
+        setProgress("已复制纯文本结果到剪贴板");
       } else {
         setProgress("没有可复制的结果");
       }
@@ -288,25 +286,6 @@ function buildMatrixRows(results: AppState["results"], search: string): MatrixRo
 function bestLatency(values: Record<string, string>) {
   const latencies = Object.values(values).map(latencyToMs).filter((value): value is number => value !== null);
   return latencies.length ? Math.min(...latencies) : Number.POSITIVE_INFINITY;
-}
-
-function buildCsvText(rows: MatrixRow[]) {
-  const sites = Array.from(new Set(rows.flatMap((row) => Object.keys(row.values))));
-  const headers = ["run_id", "region", "proxy_id", "proxy_name", "proxy_type", ...sites];
-  const data = rows.map((row) => [
-    row.runId,
-    row.regionLabel,
-    row.proxyId,
-    row.proxyName,
-    row.proxyType,
-    ...sites.map((site) => row.values[site] ?? "N/A"),
-  ]);
-  return [headers, ...data].map((cols) => cols.map(escapeCsv).join(",")).join("\n") + "\n";
-}
-
-function escapeCsv(value: string) {
-  if (!/[",\n]/.test(value)) return value;
-  return `"${value.replaceAll('"', '""')}"`;
 }
 
 function getDiagnosticsHint(state: AppState["clashSpeedtest"]) {

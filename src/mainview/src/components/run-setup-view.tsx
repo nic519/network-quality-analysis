@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { Check, FileSearch, Loader2, Play } from "lucide-react";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
+import { Card, CardContent } from "./ui/card";
 import { Input } from "./ui/input";
 import { cn } from "../lib/utils";
 import type { AppState } from "../../../shared/rpc";
@@ -38,115 +38,144 @@ export function RunSetupView({
   diagnosticsHint: string | null;
   onOpenDiagnostics: () => void;
 }) {
+  const isConfigUrl = /^https?:\/\//i.test(configPath.trim());
   const isRunDisabled =
     !configPath.trim() || !selectedRegionIds.length || isPending || state.clashSpeedtest.status === "downloading";
 
   return (
-    <section className="mx-auto max-w-7xl px-8 pb-10">
-      <div className="grid gap-6 lg:grid-cols-[1.3fr_.7fr]">
-        <Card className="border-white/10 bg-stone-950/70 shadow-2xl shadow-black/20 backdrop-blur">
-          <CardHeader>
-            <CardTitle className="text-3xl">配置并发起一次测试</CardTitle>
-            <CardDescription>先选择 Clash/Mihomo 配置和地区预设，再启动一次新的节点延迟测试。</CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-5">
-            <label className="space-y-2">
-              <span className="text-sm font-medium text-stone-300">Clash/Mihomo 配置路径或订阅 URL</span>
-              <div className="flex gap-2">
-                <Input
-                  value={configPath}
-                  onChange={(event) => onConfigPathChange(event.target.value)}
-                  placeholder="/Users/nicholas/Library/Application Support/mihomo-party/profiles/config.yaml"
-                />
-                <Button type="button" variant="outline" onClick={onSelectConfigFile} className="shrink-0">
-                  <FileSearch className="h-4 w-4" />
-                  选择文件
-                </Button>
-              </div>
-              {recentConfigPaths.length ? (
-                <div className="flex flex-wrap gap-2">
-                  {recentConfigPaths.map((item) => (
-                    <Button
-                      key={item.path}
-                      type="button"
-                      variant="secondary"
-                      className="max-w-[260px] truncate px-3"
-                      title={item.path}
-                      onClick={() => onConfigPathChange(item.path)}
-                    >
-                      {shortenPath(item.path)}
+    <section className="mx-auto max-w-7xl px-8 pb-10 pt-5">
+      <div className="grid gap-4">
+        <Card className="rounded-lg border-white/10 bg-stone-950/80 shadow-2xl shadow-black/20 backdrop-blur">
+          <CardContent className="grid gap-4 p-4">
+            <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
+              <div className="grid content-start gap-3">
+                <label className="grid gap-1.5">
+                  <span className="text-xs font-medium text-stone-400">yaml 地址</span>
+                  <div className="flex gap-2">
+                    <Input
+                      value={isConfigUrl ? "" : configPath}
+                      onChange={(event) => onConfigPathChange(event.target.value)}
+                      placeholder="/Users/nicholas/Library/Application Support/mihomo-party/profiles/config.yaml"
+                      className="h-10"
+                    />
+                    <Button type="button" variant="outline" onClick={onSelectConfigFile} className="h-10 shrink-0 px-3">
+                      <FileSearch className="h-4 w-4" />
+                      选择
                     </Button>
-                  ))}
-                </div>
-              ) : null}
-            </label>
+                  </div>
+                </label>
 
-            <div className="space-y-2">
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-sm font-medium text-stone-300">地区预设</span>
-                <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-200">
-                  多选 · {selectedRegionIds.length}/{state.regions.length}
-                </Badge>
+                {recentConfigPaths.length ? (
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="shrink-0 text-xs font-medium text-stone-500">读取预设</span>
+                    <div className="custom-scrollbar flex min-w-0 flex-1 flex-nowrap gap-2 overflow-x-auto pb-1">
+                      {recentConfigPaths.map((item) => (
+                        <Button
+                          key={item.path}
+                          type="button"
+                          variant="secondary"
+                          className="h-8 max-w-[220px] shrink-0 truncate px-3 text-xs text-stone-200"
+                          title={item.path}
+                          onClick={() => onConfigPathChange(item.path)}
+                        >
+                          {shortenPath(item.path)}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
+                <Button
+                  onClick={onStartRun}
+                  disabled={isRunDisabled}
+                  aria-busy={isPending}
+                  className="mt-1 h-14 rounded-lg bg-gradient-to-r from-emerald-300 via-lime-300 to-amber-300 px-5 text-base font-black text-stone-950 shadow-[0_0_28px_rgba(132,204,22,0.35)] transition hover:scale-[1.01] hover:from-emerald-200 hover:via-lime-200 hover:to-amber-200 disabled:hover:scale-100"
+                >
+                  {isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Play className="h-5 w-5 fill-current" />}
+                  {isPending ? "测试中..." : "开始测试"}
+                </Button>
+
+                <div className="flex min-w-0 items-baseline gap-2 text-sm">
+                  <span className="shrink-0 text-xs font-medium text-stone-500">运行状态</span>
+                  <span className="min-w-0 truncate text-stone-300">{progress}</span>
+                  {error ? <span className="shrink-0 text-red-300">{error}</span> : null}
+                </div>
               </div>
-              <div className="grid gap-2 sm:grid-cols-2" role="group" aria-label="地区预设多选">
-                {state.regions.map((region) => (
-                  <Button
-                    key={region.id}
-                    type="button"
-                    variant="outline"
-                    role="checkbox"
-                    aria-checked={selectedRegionIds.includes(region.id)}
-                    className={cn(
-                      "h-10 justify-start border-dashed px-3 text-sm",
-                      selectedRegionIds.includes(region.id)
-                        ? "border-emerald-500/55 bg-emerald-500/15 text-emerald-100 hover:bg-emerald-500/20"
-                        : "border-stone-700 bg-stone-950/40 text-stone-300 hover:bg-stone-900",
-                    )}
-                    onClick={() => onToggleRegion(region.id)}
-                  >
-                    <span
-                      className={cn(
-                        "flex h-4 w-4 shrink-0 items-center justify-center rounded border",
-                        selectedRegionIds.includes(region.id)
-                          ? "border-emerald-300 bg-emerald-400 text-emerald-950"
-                          : "border-stone-600 bg-stone-950",
-                      )}
-                    >
-                      {selectedRegionIds.includes(region.id) ? <Check className="h-3 w-3" /> : null}
-                    </span>
-                    {region.label}
-                  </Button>
-                ))}
+
+              <div className="grid content-start gap-3">
+                <label className="grid gap-1.5">
+                  <span className="text-xs font-medium text-stone-400">输入 URL</span>
+                  <Input
+                    value={isConfigUrl ? configPath : ""}
+                    onChange={(event) => onConfigPathChange(event.target.value)}
+                    placeholder="https://example.com/subscription.yaml"
+                    className="h-10"
+                  />
+                </label>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-xs font-medium text-stone-400">地区预设</span>
+                    <Badge variant="outline" className="h-6 border-emerald-500/30 bg-emerald-500/10 px-2 text-emerald-200">
+                      {selectedRegionIds.length}/{state.regions.length}
+                    </Badge>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3" role="group" aria-label="地区预设多选">
+                    {state.regions.map((region) => (
+                      <Button
+                        key={region.id}
+                        type="button"
+                        variant="outline"
+                        role="checkbox"
+                        aria-checked={selectedRegionIds.includes(region.id)}
+                        className={cn(
+                          "h-9 justify-start border-dashed px-3 text-sm",
+                          selectedRegionIds.includes(region.id)
+                            ? "border-emerald-500/55 bg-emerald-500/15 text-emerald-100 hover:bg-emerald-500/20"
+                            : "border-stone-700 bg-stone-950/40 text-stone-300 hover:bg-stone-900",
+                        )}
+                        onClick={() => onToggleRegion(region.id)}
+                      >
+                        <span
+                          className={cn(
+                            "flex h-4 w-4 shrink-0 items-center justify-center rounded border",
+                            selectedRegionIds.includes(region.id)
+                              ? "border-emerald-300 bg-emerald-400 text-emerald-950"
+                              : "border-stone-600 bg-stone-950",
+                          )}
+                        >
+                          {selectedRegionIds.includes(region.id) ? <Check className="h-3 w-3" /> : null}
+                        </span>
+                        <span className="truncate">{region.label}</span>
+                      </Button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
 
             {diagnosticsHint ? (
-              <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-100">
-                <div className="font-medium">当前建议查看诊断</div>
-                <div className="mt-1 text-amber-200/90">{diagnosticsHint}</div>
-                <Button type="button" variant="outline" className="mt-3 border-amber-400/30" onClick={onOpenDiagnostics}>
-                  打开依赖与诊断
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
+                <span className="min-w-0 truncate">{diagnosticsHint}</span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-8 shrink-0 border-amber-400/30 px-3 text-xs"
+                  onClick={onOpenDiagnostics}
+                >
+                  诊断
                 </Button>
               </div>
             ) : null}
-
-            <div className="flex flex-wrap items-center gap-3">
-              <Button onClick={onStartRun} disabled={isRunDisabled} aria-busy={isPending}>
-                {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-                {isPending ? "测试中..." : "开始测试"}
-              </Button>
-              <span className="text-sm text-stone-400">{progress}</span>
-              {error ? <span className="text-sm text-red-300">{error}</span> : null}
-            </div>
           </CardContent>
         </Card>
 
-        <Card className="border-stone-800 bg-stone-950/80">
-          <CardHeader>
-            <CardTitle className="text-2xl">执行日志</CardTitle>
-            <CardDescription>这里只显示当前执行流程的实时进度，不再与结果分析区混排。</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <Card className="rounded-lg border-stone-800 bg-stone-950/80">
+          <CardContent className="p-3">
+            <div className="mb-2 flex items-center justify-between px-1">
+              <span className="text-xs font-medium text-stone-500">日志</span>
+              <span className="text-xs text-stone-600">{progressLog.length} 条</span>
+            </div>
             <TerminalLog messages={progressLog} />
           </CardContent>
         </Card>
@@ -199,10 +228,10 @@ function TerminalLog({ messages }: { messages: string[] }) {
   };
 
   return (
-    <div className="relative rounded-2xl border border-stone-800 bg-black/25">
+    <div className="relative rounded-lg border border-stone-800 bg-black/25">
       <div
         ref={scrollAreaRef}
-        className="terminal-log-scroll-area max-h-[460px] overflow-auto p-4 pr-7 font-mono text-xs leading-6 text-stone-400"
+        className="terminal-log-scroll-area max-h-[340px] min-h-[180px] overflow-auto p-3 pr-7 font-mono text-xs leading-6 text-stone-400"
         onScroll={updateScrollState}
       >
         <div>

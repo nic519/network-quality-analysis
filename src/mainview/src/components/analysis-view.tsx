@@ -6,6 +6,7 @@ import { CardDescription, CardTitle } from "./ui/card";
 import { Input } from "./ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import type { LatencyChartRow } from "../lib/chart-data";
+import { formatRunRegionLabels } from "../lib/run-region-label";
 import { cn } from "../lib/utils";
 import { DEFAULT_SITES, latencyToMs } from "../../../shared/domain";
 import type { AppState } from "../../../shared/rpc";
@@ -116,7 +117,9 @@ export function AnalysisView({
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 text-sm">
                           <span className="truncate font-medium text-stone-100">{shortenId(run.id)}</span>
-                          <span className="truncate text-stone-500">{formatRunRegion(run, state.results)}</span>
+                          <span className="truncate text-stone-500">
+                            {formatRunRegionLabels({ run, results: state.results, regions: state.regions })}
+                          </span>
                         </div>
                         <div className="mt-1 text-xs text-stone-500">{formatDate(run.startedAt)}</div>
                       </div>
@@ -395,11 +398,6 @@ function buildFailedSiteRows(results: AppState["results"], search: string) {
     if (proxyCompare !== 0) return proxyCompare;
     return left.failedSites.length - right.failedSites.length;
   });
-}
-
-function formatRunRegion(run: AppState["runs"][number], results: AppState["results"]) {
-  const regions = Array.from(new Set(results.filter((item) => item.runId === run.id).map((item) => item.regionLabel)));
-  return regions.length ? regions.join(" / ") : run.selectedRegions.join(" / ");
 }
 
 function formatDate(value: string) {

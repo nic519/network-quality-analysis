@@ -2,10 +2,19 @@ import { describe, expect, test } from "bun:test";
 import { REGION_PRESETS, latencyStatus, latencyToMs, parseTSVOutput } from "./domain";
 
 describe("region presets", () => {
-  test("exposes Hong Kong and Japan without user-authored filters", () => {
-    expect(REGION_PRESETS.map((region) => region.id)).toEqual(["hong-kong", "japan"]);
-    expect(REGION_PRESETS[0].filterRegex).toContain("香港");
-    expect(REGION_PRESETS[1].filterRegex).toContain("Japan");
+  test("exposes built-in location presets without user-authored filters", () => {
+    expect(REGION_PRESETS.map((region) => region.id)).toEqual([
+      "hong-kong",
+      "singapore",
+      "japan",
+      "united-states",
+      "taiwan",
+    ]);
+    expect(REGION_PRESETS.find((region) => region.id === "hong-kong")?.filterRegex).toContain("香港");
+    expect(REGION_PRESETS.find((region) => region.id === "singapore")?.filterRegex).toContain("Singapore");
+    expect(REGION_PRESETS.find((region) => region.id === "japan")?.filterRegex).toContain("Japan");
+    expect(REGION_PRESETS.find((region) => region.id === "united-states")?.filterRegex).toContain("United States");
+    expect(REGION_PRESETS.find((region) => region.id === "taiwan")?.filterRegex).toContain("Taiwan");
   });
 });
 

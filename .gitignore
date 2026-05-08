@@ -5,4 +5,4 @@ build/
 dist-web/
 *.log
 
-resources/bin/*
+.codex/skills/ui-ux-pro-max/*

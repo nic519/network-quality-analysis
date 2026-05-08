@@ -1,5 +1,5 @@
 export type RegionPreset = {
-  id: "hong-kong" | "japan";
+  id: "hong-kong" | "singapore" | "japan" | "united-states" | "taiwan";
   label: string;
   shortLabel: string;
   filterRegex: string;
@@ -58,10 +58,28 @@ export const REGION_PRESETS: RegionPreset[] = [
     filterRegex: "HK|港|香港|Hong Kong|HongKong",
   },
   {
+    id: "singapore",
+    label: "新加坡",
+    shortLabel: "SG",
+    filterRegex: "SG|新加坡|狮城|Singapore|Singa",
+  },
+  {
     id: "japan",
     label: "日本",
     shortLabel: "JP",
     filterRegex: "JP|日|日本|Japan|Tokyo|大阪|东京",
+  },
+  {
+    id: "united-states",
+    label: "美国",
+    shortLabel: "US",
+    filterRegex: "US|USA|美|美国|United States|America|Los Angeles|San Jose|Seattle|New York",
+  },
+  {
+    id: "taiwan",
+    label: "台湾",
+    shortLabel: "TW",
+    filterRegex: "TW|台|台湾|臺灣|Taiwan|Taipei|台北|臺北",
   },
 ];
 
