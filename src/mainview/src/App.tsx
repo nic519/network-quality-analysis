@@ -20,15 +20,11 @@ export default function App() {
     runs: [],
     results: [],
     clashSpeedtest: {
-      status: "checking-update",
+      status: "missing",
       version: null,
-      latestVersion: null,
-      updateAvailable: null,
-      updateCheckStatus: "idle",
-      updateCheckMessage: null,
       path: null,
       source: null,
-      message: "正在检查 clash-speedtest 状态",
+      message: "正在检查本地 clash-speedtest",
       checkedAt: new Date().toISOString(),
     },
   });
@@ -290,8 +286,7 @@ function bestLatency(values: Record<string, string>) {
 
 function getDiagnosticsHint(state: AppState["clashSpeedtest"]) {
   if (state.status === "error") return state.message;
-  if (state.status === "missing" && state.updateCheckStatus === "failed") return "本地尚未下载，且远端检查失败；这更像网络或 GitHub 限流问题。";
-  if (state.updateCheckStatus === "failed") return "本地可用，但当前无法确认远端最新版本。";
+  if (state.status === "missing") return "未检测到本地 clash-speedtest，请先运行 go install 或在依赖页指定路径。";
   return null;
 }
 

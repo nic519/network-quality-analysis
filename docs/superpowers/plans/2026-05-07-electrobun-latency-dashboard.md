@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build a React + shadcn/ui Electrobun desktop app that runs bundled `clash-speedtest`, stores history in SQLite, displays latency results visually, and exports CSV.
+**Goal:** Build a React + shadcn/ui Electrobun desktop app that runs a user-installed `clash-speedtest`, stores history in SQLite, displays latency results visually, and exports CSV.
 
 **Architecture:** The Bun host owns native concerns: process execution, SQLite persistence, and CSV export. The React WebView owns presentation and calls the host through typed Electrobun RPC. Core parsing and summary logic are written as testable TypeScript modules.
 
@@ -56,7 +56,7 @@
 
 - [ ] Test command arguments include `-c`, `-f`, `--speed-mode fast`, and `--latency-url`.
 - [ ] Test parsed rows are normalized with run, region, and site metadata.
-- [ ] Implement process execution against the bundled binary path.
+- [ ] Implement process execution against the resolved user-installed binary path.
 
 ### Task 5: Implement CSV Export
 
@@ -81,14 +81,13 @@
 - [ ] Render summary cards and latency matrix with icons and colors.
 - [ ] Add Start Test and Export CSV actions wired to RPC.
 
-### Task 7: Build Embedded Binary
+### Task 7: Wire User-Installed Binary
 
 **Files:**
-- Create: `scripts/build-clash-speedtest.ts`
 - Modify: `package.json`
 
-- [ ] Build `/Users/nicholas/Desktop/my_program/clash-speedtest` to `resources/bin/clash-speedtest`.
-- [ ] Add scripts for app dev, tests, frontend build, and binary build.
+- [ ] Resolve `clash-speedtest` from `CLASH_SPEEDTEST_PATH`, manual path, `GOBIN`, or `GOPATH/bin`.
+- [ ] Add scripts for app dev, tests, and frontend build.
 
 ### Task 8: Verify
 
@@ -96,6 +95,5 @@
 - Modify: `README.md`
 
 - [ ] Run `bun test`.
-- [ ] Run the clash-speedtest build script.
 - [ ] Run Vite build.
 - [ ] Document first-version usage and architecture.

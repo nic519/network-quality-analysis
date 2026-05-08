@@ -38,8 +38,7 @@ export function RunSetupView({
   diagnosticsHint: string | null;
   onOpenDiagnostics: () => void;
 }) {
-  const isRunDisabled =
-    !configPath.trim() || !selectedRegionIds.length || isPending || state.clashSpeedtest.status === "downloading";
+  const isRunDisabled = !configPath.trim() || !selectedRegionIds.length || isPending;
 
   return (
     <section className="mx-auto max-w-7xl px-8 pb-10 pt-5">

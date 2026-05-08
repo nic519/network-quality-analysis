@@ -1,13 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { REGION_PRESETS, type SiteDefinition } from "../shared/domain";
 import {
   buildSpeedtestArgs,
   executeSpeedtest,
   normalizeSpeedtestRows,
-  resolveBundledBinaryPathFrom,
   runLatencyTest,
   validateRunnableInputs,
 } from "./runner";
@@ -204,20 +203,6 @@ describe("runLatencyTest", () => {
 
     expect(output).toContain("HK-01");
     expect(messages).toContain("[clash-speedtest] loading proxies");
-  });
-});
-
-describe("resolveBundledBinaryPathFrom", () => {
-  test("resolves Electrobun macOS app resource path from Contents/MacOS cwd", () => {
-    const root = join(tmpdir(), `latency-compass-${Date.now()}`);
-    const cwd = join(root, "Latency Compass-dev.app/Contents/MacOS");
-    const resourceBinary = join(root, "Latency Compass-dev.app/Contents/Resources/app/resources/bin/clash-speedtest");
-    mkdirSync(dirname(resourceBinary), { recursive: true });
-    writeFileSync(resourceBinary, "");
-
-    const resolved = resolveBundledBinaryPathFrom(cwd, "/tmp/source/src/bun");
-
-    expect(resolved).toBe(resourceBinary);
   });
 });
 

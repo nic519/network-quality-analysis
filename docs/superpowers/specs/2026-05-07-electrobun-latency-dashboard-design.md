@@ -2,7 +2,7 @@
 
 ## Goal
 
-Rewrite this project as a desktop UI for testing website latency through `clash-speedtest`, with React + shadcn/ui in Electrobun and `clash-speedtest` embedded as a bundled binary.
+Rewrite this project as a desktop UI for testing website latency through `clash-speedtest`, with React + shadcn/ui in Electrobun. The app treats `clash-speedtest` as a user-installed system dependency and guides users to run `go install github.com/nic519/clash-speedtest@latest`.
 
 ## First Version Scope
 
@@ -26,7 +26,7 @@ Rewrite this project as a desktop UI for testing website latency through `clash-
 
 - Electrobun Bun host starts a desktop window and exposes RPC handlers to the React WebView.
 - React renders the dashboard using shadcn/ui components and calls host RPC for data and test execution.
-- The host builds or uses a bundled `clash-speedtest` binary from `/Users/nicholas/Desktop/my_program/clash-speedtest`.
+- The host resolves `clash-speedtest` from `CLASH_SPEEDTEST_PATH`, a manually specified path, `GOBIN`, or `GOPATH/bin`.
 - The host runs `clash-speedtest` in TSV mode per site and region preset, parses output, and stores normalized rows in SQLite.
 - CSV summary exports are generated from SQLite rows, not from UI state.
 

@@ -1,5 +1,4 @@
 import { existsSync, statSync } from "node:fs";
-import { dirname, join } from "node:path";
 import { resolveClashSpeedtestPath, type ResolveClashSpeedtestOptions } from "./clash-speedtest";
 import {
   DEFAULT_SITES,
@@ -170,22 +169,6 @@ export function normalizeSpeedtestRows(
     siteName: site.name,
     siteUrl: site.url,
   }));
-}
-
-export function resolveBundledBinaryPath(): string {
-  return resolveBundledBinaryPathFrom(process.cwd(), import.meta.dir);
-}
-
-export function resolveBundledBinaryPathFrom(cwd: string, moduleDir: string): string {
-  const macosDir = cwd;
-  const resourcesDir = join(dirname(macosDir), "Resources");
-  const candidates = [
-    join(cwd, "resources/bin/clash-speedtest"),
-    join(resourcesDir, "app/resources/bin/clash-speedtest"),
-    join(moduleDir, "../../resources/bin/clash-speedtest"),
-  ];
-  const found = candidates.find((candidate) => existsSync(candidate));
-  return found ?? candidates[0];
 }
 
 export async function executeSpeedtest(

@@ -20,7 +20,7 @@ db.migrate();
 ApplicationMenu.setApplicationMenu(buildApplicationMenu());
 let manualClashSpeedtestPath = loadManualClashSpeedtestPath();
 let clashSpeedtestState = makeClashSpeedtestState({
-  status: "checking-update",
+  status: "missing",
   checkedAt: new Date().toISOString(),
 });
 

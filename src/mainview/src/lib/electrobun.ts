@@ -57,14 +57,10 @@ function createPreviewApi() {
     ],
     clashSpeedtest: {
       status: "ready",
-      version: "v0.0.1",
-      latestVersion: "v0.0.1",
-      updateAvailable: false,
-      updateCheckStatus: "ok",
-      updateCheckMessage: null,
+      version: null,
       path: "~/go/bin/clash-speedtest",
       source: "go-install",
-      message: "已检测到 clash-speedtest，当前最新版本为 v0.0.1",
+      message: "已检测到 clash-speedtest，可直接运行",
       checkedAt: new Date().toISOString(),
     },
     runs: [

@@ -9,7 +9,6 @@
     "build": "bun run build:css && electrobun build",
     "build:css": "tailwindcss -i src/mainview/src/index.css -o src/mainview/electrobun.css --minify",
     "build:web": "vite build",
-    "build:clash-speedtest": "bun run scripts/build-clash-speedtest.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit"
   },

@@ -12,12 +12,8 @@ export type AppState = {
 };
 
 export type ClashSpeedtestState = {
-  status: "missing" | "ready" | "downloading" | "checking-update" | "error";
+  status: "missing" | "ready" | "error";
   version: string | null;
-  latestVersion: string | null;
-  updateAvailable: boolean | null;
-  updateCheckStatus: "idle" | "ok" | "failed";
-  updateCheckMessage: string | null;
   path: string | null;
   source: "environment" | "go-install" | "manual" | null;
   message: string;
