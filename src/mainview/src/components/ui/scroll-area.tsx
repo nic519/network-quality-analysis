@@ -14,14 +14,14 @@ export function getScrollAreaViewportClassName(className?: string) {
 
 export function getScrollAreaTrackClassName(className?: string) {
   return cn(
-    "absolute bottom-3 right-2 top-3 w-2 rounded-full bg-stone-900/80 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]",
+    "absolute bottom-3 right-2 top-3 w-2 rounded-full bg-muted",
     className,
   );
 }
 
 export function getScrollAreaThumbClassName(className?: string) {
   return cn(
-    "absolute left-0 w-full rounded-full bg-emerald-300/45 shadow-[inset_0_0_0_1px_rgba(209,250,229,0.18)] transition-colors hover:bg-emerald-200/60",
+    "absolute left-0 w-full rounded-full bg-muted-foreground/45 transition-colors hover:bg-muted-foreground/65",
     className,
   );
 }

@@ -7,10 +7,10 @@ export function ClashSpeedtestQuickStatus({ state }: { state: ClashSpeedtestStat
   const Icon = getClashSpeedtestStatusIcon(state);
 
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-stone-800 bg-stone-950/75 px-3 py-2 text-sm text-stone-200">
+    <div className="flex h-8 items-center gap-2 rounded-md px-2 text-sm text-secondary-foreground">
       <Icon className={cn("h-4 w-4", getStatusTone(state), isBusy(state) ? "animate-spin" : "")} />
-      <span className="font-medium">{getQuickStatusLabel(state)}</span>
-      <Badge variant="outline" className={cn("hidden md:inline-flex", getQuickStatusBadgeClass(state))}>
+      <span className="min-w-0 flex-1 truncate">{getQuickStatusLabel(state)}</span>
+      <Badge variant="outline" className={cn("shrink-0", getQuickStatusBadgeClass(state))}>
         {getQuickStatusBadgeText(state)}
       </Badge>
     </div>
@@ -22,12 +22,12 @@ export function ClashSpeedtestDiagnosticsPanel({ state }: { state: ClashSpeedtes
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-2 text-sm text-stone-200">
+      <div className="flex items-center gap-2 text-sm text-secondary-foreground">
         <Icon className={cn("h-4 w-4", getStatusTone(state), isBusy(state) ? "animate-spin" : "")} />
         <span>{getDetailedStatusLabel(state)}</span>
       </div>
-      <div className="text-sm text-stone-300">{getDiagnosticsSummary(state)}</div>
-      {state.path ? <div className="break-all rounded-xl border border-stone-800 bg-black/20 px-4 py-3 text-sm text-stone-200">{state.path}</div> : null}
+      <div className="text-sm text-muted-foreground">{getDiagnosticsSummary(state)}</div>
+      {state.path ? <div className="break-all rounded-md border border-border bg-secondary/35 px-3 py-2 text-sm text-secondary-foreground">{state.path}</div> : null}
     </div>
   );
 }
@@ -65,13 +65,13 @@ function getQuickStatusBadgeText(state: ClashSpeedtestState) {
 
 function getQuickStatusBadgeClass(state: ClashSpeedtestState) {
   if (state.status === "error") return "border-red-500/40 bg-red-500/10 text-red-200";
-  if (state.status === "missing") return "border-stone-700 bg-stone-900/60 text-stone-300";
-  return "border-emerald-500/40 bg-emerald-500/10 text-emerald-200";
+  if (state.status === "missing") return "border-border bg-muted text-muted-foreground";
+  return "border-emerald-500/35 bg-emerald-500/10 text-emerald-200";
 }
 
 function getStatusTone(state: ClashSpeedtestState) {
   if (state.status === "error") return "text-red-300";
-  if (state.status === "missing") return "text-stone-300";
+  if (state.status === "missing") return "text-muted-foreground";
   return "text-emerald-300";
 }
 

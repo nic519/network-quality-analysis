@@ -22,8 +22,12 @@ export function TopNavigation({
   state: ClashSpeedtestState;
 }) {
   return (
-    <div className="flex h-full flex-col gap-4 rounded-2xl border border-white/10 bg-stone-950/60 p-3 backdrop-blur">
-      <div className="flex flex-1 flex-col gap-2" role="tablist" aria-label="主导航">
+    <div className="flex h-full flex-col">
+      <div className="px-3 pb-2 pt-4">
+        <div className="text-xs font-medium text-muted-foreground">Latency Compass</div>
+      </div>
+
+      <div className="flex flex-1 flex-col gap-1 px-2" role="tablist" aria-label="主导航">
         {viewItems.map((item) => {
           const Icon = item.icon;
           const active = item.id === activeView;
@@ -36,19 +40,20 @@ export function TopNavigation({
               aria-selected={active}
               onClick={() => onChange(item.id)}
               className={cn(
-                "h-11 w-full justify-start rounded-xl px-3 text-sm",
+                "h-8 w-full justify-start rounded-md px-2 text-sm",
                 active
-                  ? "bg-stone-100 text-stone-950 hover:bg-stone-100"
-                  : "border border-stone-800 bg-stone-950/50 text-stone-300 hover:bg-stone-900 hover:text-stone-100",
+                  ? "bg-accent text-accent-foreground hover:bg-accent"
+                  : "text-muted-foreground hover:bg-accent/65 hover:text-foreground",
               )}
             >
-              <Icon className="h-4 w-4" />
+              <Icon className="h-4 w-4 shrink-0" />
               {item.label}
             </Button>
           );
         })}
       </div>
-      <div className="border-t border-white/10 pt-3">
+
+      <div className="border-t border-border px-2 py-3">
         <ClashSpeedtestQuickStatus state={state} />
       </div>
     </div>

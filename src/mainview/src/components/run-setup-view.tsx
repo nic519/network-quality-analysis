@@ -1,7 +1,6 @@
 import { Check, FileSearch, Loader2, Play } from "lucide-react";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
-import { Card, CardContent } from "./ui/card";
 import { Input } from "./ui/input";
 import { ScrollArea } from "./ui/scroll-area";
 import { cn } from "../lib/utils";
@@ -42,14 +41,23 @@ export function RunSetupView({
   const isRunDisabled = !configPath.trim() || !selectedRegionIds.length || !enabledSites.length || isPending;
 
   return (
-    <section className="mx-auto max-w-7xl px-8 pb-10 pt-5">
-      <div className="grid gap-4">
-        <Card className="rounded-lg border-white/10 bg-stone-950/80 shadow-2xl shadow-black/20 backdrop-blur">
-          <CardContent className="grid gap-4 p-4">
-            <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
+    <section className="mx-auto max-w-6xl px-6 pb-8">
+      <header className="flex h-14 items-center justify-between border-b border-border">
+        <div>
+          <h1 className="text-base font-semibold text-foreground">执行测试</h1>
+          <p className="text-xs text-muted-foreground">选择订阅配置和地区，然后运行延迟测试。</p>
+        </div>
+        <Badge variant="outline" className="border-border bg-secondary text-muted-foreground">
+          {enabledSites.length} 个网站
+        </Badge>
+      </header>
+
+      <div className="divide-y divide-border">
+        <section className="py-5">
+          <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
               <div className="grid content-start gap-3">
                 <label className="grid gap-1.5">
-                  <span className="text-xs font-medium text-stone-400">yaml 地址或 URL</span>
+                  <span className="text-xs font-medium text-muted-foreground">yaml 地址或 URL</span>
                   <div className="flex gap-2">
                     <Input
                       value={configPath}
@@ -57,14 +65,14 @@ export function RunSetupView({
                       placeholder="/Users/nicholas/.../config.yaml 或 https://example.com/subscription.yaml"
                       className="h-10"
                     />
-                    <Button type="button" variant="outline" onClick={onSelectConfigFile} className="h-10 shrink-0 px-3">
+                    <Button type="button" variant="outline" onClick={onSelectConfigFile} className="shrink-0">
                       <FileSearch className="h-4 w-4" />
                       选择
                     </Button>
                   </div>
                 </label>
                 <div className="grid gap-1.5">
-                  <span className="text-xs font-medium text-stone-400">读取预设</span>
+                  <span className="text-xs font-medium text-muted-foreground">读取预设</span>
                   {recentConfigPaths.length ? (
                     <div className="custom-scrollbar flex min-w-0 flex-nowrap gap-2 overflow-x-auto pb-1">
                       {recentConfigPaths.map((item) => (
@@ -72,7 +80,7 @@ export function RunSetupView({
                           key={item.path}
                           type="button"
                           variant="secondary"
-                          className="h-8 max-w-[220px] shrink-0 truncate px-3 text-xs text-stone-200"
+                          className="h-8 max-w-[220px] shrink-0 truncate px-2.5 text-xs"
                           title={item.path}
                           onClick={() => onConfigPathChange(item.path)}
                         >
@@ -81,7 +89,7 @@ export function RunSetupView({
                       ))}
                     </div>
                   ) : (
-                    <span className="text-sm text-stone-600">暂无历史地址</span>
+                    <span className="text-sm text-muted-foreground">暂无历史地址</span>
                   )}
                 </div>
               </div>
@@ -89,8 +97,8 @@ export function RunSetupView({
               <div className="grid content-start gap-3">
                 <div className="space-y-2">
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-xs font-medium text-stone-400">地区预设</span>
-                    <Badge variant="outline" className="h-6 border-emerald-500/30 bg-emerald-500/10 px-2 text-emerald-200">
+                    <span className="text-xs font-medium text-muted-foreground">地区预设</span>
+                    <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-200">
                       {selectedRegionIds.length}/{state.regions.length}
                     </Badge>
                   </div>
@@ -103,10 +111,10 @@ export function RunSetupView({
                         role="checkbox"
                         aria-checked={selectedRegionIds.includes(region.id)}
                         className={cn(
-                          "h-9 justify-start border-dashed px-3 text-sm",
+                          "h-8 justify-start px-2.5 text-sm",
                           selectedRegionIds.includes(region.id)
-                            ? "border-emerald-500/55 bg-emerald-500/15 text-emerald-100 hover:bg-emerald-500/20"
-                            : "border-stone-700 bg-stone-950/40 text-stone-300 hover:bg-stone-900",
+                            ? "border-emerald-500/45 bg-emerald-500/12 text-emerald-100 hover:bg-emerald-500/16"
+                            : "border-input bg-secondary/35 text-secondary-foreground hover:bg-accent",
                         )}
                         onClick={() => onToggleRegion(region.id)}
                       >
@@ -115,7 +123,7 @@ export function RunSetupView({
                             "flex h-4 w-4 shrink-0 items-center justify-center rounded border",
                             selectedRegionIds.includes(region.id)
                               ? "border-emerald-300 bg-emerald-400 text-emerald-950"
-                              : "border-stone-600 bg-stone-950",
+                              : "border-input bg-background",
                           )}
                         >
                           {selectedRegionIds.includes(region.id) ? <Check className="h-3 w-3" /> : null}
@@ -125,44 +133,42 @@ export function RunSetupView({
                     ))}
                   </div>
                 </div>
-                <div className="rounded-xl border border-stone-800 bg-stone-950/50 px-3 py-2 text-xs text-stone-400">
+                <div className="rounded-md border border-border bg-secondary/35 px-3 py-2 text-xs text-muted-foreground">
                   当前会测试 {enabledSites.length} 个网站：
-                  <span className="text-stone-200"> {enabledSites.map((site) => site.name).join("、") || "请先到设置页启用网站"}</span>
+                  <span className="text-secondary-foreground"> {enabledSites.map((site) => site.name).join("、") || "请先到设置页启用网站"}</span>
                 </div>
               </div>
             </div>
 
             {diagnosticsHint ? (
-              <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
+              <div className="mt-4 flex items-center justify-between gap-3 rounded-md border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
                 <span className="min-w-0 truncate">{diagnosticsHint}</span>
                 <Button
                   type="button"
                   variant="outline"
-                  className="h-8 shrink-0 border-amber-400/30 px-3 text-xs"
+                  className="h-8 shrink-0 border-amber-400/30 px-2.5 text-xs"
                   onClick={onOpenDiagnostics}
                 >
                   诊断
                 </Button>
               </div>
             ) : null}
-          </CardContent>
-        </Card>
+        </section>
 
-        <Card className="rounded-lg border-stone-800 bg-stone-950/80">
-          <CardContent className="grid gap-4 p-3 lg:grid-cols-[1fr_2fr]">
-            <div className="grid content-start gap-3 p-1">
+        <section className="grid gap-4 py-5 lg:grid-cols-[280px_minmax(0,1fr)]">
+            <div className="grid content-start gap-3">
               <Button
                 onClick={onStartRun}
                 disabled={isRunDisabled}
                 aria-busy={isPending}
-                className="h-16 rounded-lg bg-gradient-to-r from-emerald-300 via-lime-300 to-amber-300 px-5 text-base font-black text-stone-950 shadow-[0_0_28px_rgba(132,204,22,0.35)] transition hover:scale-[1.01] hover:from-emerald-200 hover:via-lime-200 hover:to-amber-200 disabled:hover:scale-100"
+                className="h-10 justify-start px-3"
               >
                 {isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Play className="h-5 w-5 fill-current" />}
                 {isPending ? "测试中..." : "开始测试"}
               </Button>
 
               <div className="grid gap-1 text-sm">
-                <span className="min-w-0 break-words text-stone-300">{progress}</span>
+                <span className="min-w-0 break-words text-secondary-foreground">{progress}</span>
                 {error ? <span className="break-words text-red-300">{error}</span> : null}
               </div>
             </div>
@@ -170,8 +176,7 @@ export function RunSetupView({
             <div className="min-w-0">
               <TerminalLog messages={progressLog} />
             </div>
-          </CardContent>
-        </Card>
+        </section>
       </div>
     </section>
   );
@@ -180,8 +185,8 @@ export function RunSetupView({
 function TerminalLog({ messages }: { messages: string[] }) {
   return (
     <ScrollArea
-      className="rounded-lg border border-stone-800 bg-black/25"
-      viewportClassName="max-h-[340px] min-h-[180px] p-3 font-mono text-xs leading-6 text-stone-400"
+      className="rounded-md border border-border bg-secondary/35"
+      viewportClassName="max-h-[340px] min-h-[180px] p-3 font-mono text-xs leading-6 text-muted-foreground"
       contentClassName="space-y-0"
     >
       {messages.map((message, index) => (

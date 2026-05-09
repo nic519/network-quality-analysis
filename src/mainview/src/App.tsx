@@ -208,12 +208,12 @@ export default function App() {
   }
 
   return (
-    <main className="flex min-h-screen overflow-hidden bg-background text-foreground">
-      <aside className="sticky top-0 h-screen w-[220px] shrink-0 border-r border-white/10 p-4">
+    <main className="flex h-screen overflow-hidden bg-background text-foreground">
+      <aside className="sticky top-0 h-screen w-[196px] shrink-0 border-r border-border bg-secondary/65">
         <TopNavigation activeView={activeView} onChange={setActiveView} state={state.clashSpeedtest} />
       </aside>
 
-      <div className="custom-scrollbar min-w-0 flex-1 overflow-y-auto py-5">
+      <div className="custom-scrollbar min-w-0 flex-1 overflow-y-auto">
         {activeView === "run" ? (
           <RunSetupView
             state={state}

@@ -9,8 +9,8 @@ describe("scroll area", () => {
   });
 
   test("exposes shared track and thumb styles", () => {
-    expect(getScrollAreaTrackClassName()).toContain("bg-stone-900/80");
-    expect(getScrollAreaThumbClassName()).toContain("bg-emerald-300/45");
+    expect(getScrollAreaTrackClassName()).toContain("bg-muted");
+    expect(getScrollAreaThumbClassName()).toContain("bg-muted-foreground/45");
   });
 
   test("renders the shared viewport shell", () => {

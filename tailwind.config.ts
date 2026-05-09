@@ -42,8 +42,8 @@ export default {
         sm: "calc(var(--radius) - 4px)",
       },
       fontFamily: {
-        sans: ["Avenir Next", "Gill Sans", "ui-sans-serif", "system-ui", "sans-serif"],
-        display: ["Bricolage Grotesque", "Avenir Next", "ui-sans-serif", "system-ui", "sans-serif"],
+        sans: ["-apple-system", "BlinkMacSystemFont", "SF Pro Text", "Inter", "ui-sans-serif", "system-ui", "sans-serif"],
+        display: ["-apple-system", "BlinkMacSystemFont", "SF Pro Display", "ui-sans-serif", "system-ui", "sans-serif"],
       },
     },
   },
