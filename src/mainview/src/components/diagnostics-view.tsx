@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ChevronDown, Download, FolderOpen, Plus, RotateCcw, Save, Trash2, X } from "lucide-react";
+import { Check, ChevronDown, Copy, Download, FolderOpen, Plus, RotateCcw, Save, Trash2, X } from "lucide-react";
 import { ClashSpeedtestDiagnosticsPanel } from "./clash-speedtest-status";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -17,6 +17,7 @@ export function DiagnosticsView({
   onResetBinaryPath,
   onSaveSites,
   onExportAllResults,
+  onCopyInstallCommand,
   canExportResults,
 }: {
   state: AppState["clashSpeedtest"];
@@ -26,10 +27,12 @@ export function DiagnosticsView({
   onResetBinaryPath: () => Promise<void>;
   onSaveSites: (sites: SiteDefinition[]) => Promise<void>;
   onExportAllResults: () => void;
+  onCopyInstallCommand: () => Promise<void>;
   canExportResults: boolean;
 }) {
   const [manualPath, setManualPath] = useState(state.source === "manual" ? state.path ?? "" : "");
   const [draftSites, setDraftSites] = useState<SiteDefinition[]>(sites);
+  const [didCopyInstallCommand, setDidCopyInstallCommand] = useState(false);
 
   useEffect(() => {
     setManualPath(state.source === "manual" ? state.path ?? "" : "");
@@ -38,6 +41,13 @@ export function DiagnosticsView({
   useEffect(() => {
     setDraftSites(sites);
   }, [sites]);
+
+  useEffect(() => {
+    if (!didCopyInstallCommand) return;
+
+    const timeoutId = window.setTimeout(() => setDidCopyInstallCommand(false), 1500);
+    return () => window.clearTimeout(timeoutId);
+  }, [didCopyInstallCommand]);
 
   return (
     <section className="custom-scrollbar h-full overflow-y-auto px-6 pb-8">
@@ -124,8 +134,24 @@ export function DiagnosticsView({
 
           <section className="grid gap-3 py-5">
             <h2 className="text-sm font-semibold text-foreground">依赖</h2>
-            <div className="rounded-md border border-border bg-secondary/35 px-3 py-2 font-mono text-sm text-secondary-foreground">
-              {GO_INSTALL_COMMAND}
+            <div className="flex items-center gap-2 rounded-md border border-border bg-secondary/35 px-3 py-2">
+              <div className="min-w-0 flex-1 overflow-x-auto font-mono text-sm text-secondary-foreground">
+                <div className="w-max min-w-full">{GO_INSTALL_COMMAND}</div>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 shrink-0 px-0 text-muted-foreground hover:text-foreground"
+                aria-label="复制安装命令"
+                title="复制安装命令"
+                onClick={async () => {
+                  await onCopyInstallCommand();
+                  setDidCopyInstallCommand(true);
+                }}
+              >
+                {didCopyInstallCommand ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              </Button>
             </div>
             <ClashSpeedtestDiagnosticsPanel state={state} />
           </section>

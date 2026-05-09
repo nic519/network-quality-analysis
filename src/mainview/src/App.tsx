@@ -131,6 +131,16 @@ export default function App() {
     }
   }
 
+  async function copyInstallCommand() {
+    setError(null);
+    try {
+      await navigator.clipboard.writeText("go install github.com/nic519/clash-speedtest@latest");
+      setProgress("已复制安装命令");
+    } catch (caught) {
+      setError(toErrorMessage(caught));
+    }
+  }
+
   async function exportAllResults() {
     setError(null);
     try {
@@ -260,6 +270,7 @@ export default function App() {
             onResetBinaryPath={resetClashSpeedtestBinaryPath}
             onSaveSites={saveTestSites}
             onExportAllResults={exportAllResults}
+            onCopyInstallCommand={copyInstallCommand}
             canExportResults={Boolean(state.results.length)}
           />
         ) : null}
