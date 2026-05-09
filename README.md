@@ -34,6 +34,21 @@ bun run build:web
 bun run dev
 ```
 
+## Release Build
+
+Push a Git tag whose version matches `package.json` to trigger the GitHub Action
+that builds the desktop app for macOS and Windows.
+
+Example:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+The workflow uploads zipped build artifacts to both the Actions run and the
+GitHub Release for that tag.
+
 The app expects a local Clash/Mihomo config path or subscription URL in the UI.
 Filters are not user-authored in the first version; selecting `香港` or `日本`
 uses the region regexes defined in `src/shared/domain.ts`.
