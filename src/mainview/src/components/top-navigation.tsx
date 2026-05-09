@@ -22,8 +22,8 @@ export function TopNavigation({
   state: ClashSpeedtestState;
 }) {
   return (
-    <div className="flex flex-col gap-4 rounded-3xl border border-white/10 bg-stone-950/60 p-4 backdrop-blur lg:flex-row lg:items-center lg:justify-between">
-      <div className="flex flex-wrap gap-2" role="tablist" aria-label="主导航">
+    <div className="flex h-full flex-col gap-4 rounded-2xl border border-white/10 bg-stone-950/60 p-3 backdrop-blur">
+      <div className="flex flex-1 flex-col gap-2" role="tablist" aria-label="主导航">
         {viewItems.map((item) => {
           const Icon = item.icon;
           const active = item.id === activeView;
@@ -36,7 +36,7 @@ export function TopNavigation({
               aria-selected={active}
               onClick={() => onChange(item.id)}
               className={cn(
-                "h-11 rounded-full px-4 text-sm",
+                "h-11 w-full justify-start rounded-xl px-3 text-sm",
                 active
                   ? "bg-stone-100 text-stone-950 hover:bg-stone-100"
                   : "border border-stone-800 bg-stone-950/50 text-stone-300 hover:bg-stone-900 hover:text-stone-100",
@@ -48,7 +48,9 @@ export function TopNavigation({
           );
         })}
       </div>
-      <ClashSpeedtestQuickStatus state={state} />
+      <div className="border-t border-white/10 pt-3">
+        <ClashSpeedtestQuickStatus state={state} />
+      </div>
     </div>
   );
 }

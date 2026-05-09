@@ -208,61 +208,61 @@ export default function App() {
   }
 
   return (
-    <main className="min-h-screen overflow-hidden bg-background text-foreground">
-      <section className="border-b border-white/10 px-8 py-5">
-        <div className="mx-auto max-w-7xl">
-          <TopNavigation activeView={activeView} onChange={setActiveView} state={state.clashSpeedtest} />
-        </div>
-      </section>
+    <main className="flex min-h-screen overflow-hidden bg-background text-foreground">
+      <aside className="sticky top-0 h-screen w-[220px] shrink-0 border-r border-white/10 p-4">
+        <TopNavigation activeView={activeView} onChange={setActiveView} state={state.clashSpeedtest} />
+      </aside>
 
-      {activeView === "run" ? (
-        <RunSetupView
-          state={state}
-          configPath={configPath}
-          onConfigPathChange={setConfigPath}
-          onSelectConfigFile={selectConfigFile}
-          recentConfigPaths={recentConfigPaths}
-          selectedRegionIds={selectedRegionIds}
-          onToggleRegion={toggleRegion}
-          progress={progress}
-          progressLog={progressLog}
-          error={error}
-          onStartRun={startRun}
-          isPending={isRunPending}
-          diagnosticsHint={diagnosticsHint}
-          onOpenDiagnostics={() => setActiveView("diagnostics")}
-        />
-      ) : null}
+      <div className="custom-scrollbar min-w-0 flex-1 overflow-y-auto py-5">
+        {activeView === "run" ? (
+          <RunSetupView
+            state={state}
+            configPath={configPath}
+            onConfigPathChange={setConfigPath}
+            onSelectConfigFile={selectConfigFile}
+            recentConfigPaths={recentConfigPaths}
+            selectedRegionIds={selectedRegionIds}
+            onToggleRegion={toggleRegion}
+            progress={progress}
+            progressLog={progressLog}
+            error={error}
+            onStartRun={startRun}
+            isPending={isRunPending}
+            diagnosticsHint={diagnosticsHint}
+            onOpenDiagnostics={() => setActiveView("diagnostics")}
+          />
+        ) : null}
 
-      {activeView === "analysis" ? (
-        <AnalysisView
-          state={state}
-          selectedRunId={selectedRunId}
-          onSelectedRunIdChange={setSelectedRunId}
-          fromDate={fromDate}
-          toDate={toDate}
-          onFromDateChange={setFromDate}
-          onToDateChange={setToDate}
-          search={search}
-          onSearchChange={setSearch}
-          selectedSiteId={selectedSiteId}
-          onSelectedSiteIdChange={setSelectedSiteId}
-          error={error}
-          onCopyResults={copyResults}
-          onExportAllResults={exportAllResults}
-        />
-      ) : null}
+        {activeView === "analysis" ? (
+          <AnalysisView
+            state={state}
+            selectedRunId={selectedRunId}
+            onSelectedRunIdChange={setSelectedRunId}
+            fromDate={fromDate}
+            toDate={toDate}
+            onFromDateChange={setFromDate}
+            onToDateChange={setToDate}
+            search={search}
+            onSearchChange={setSearch}
+            selectedSiteId={selectedSiteId}
+            onSelectedSiteIdChange={setSelectedSiteId}
+            error={error}
+            onCopyResults={copyResults}
+            onExportAllResults={exportAllResults}
+          />
+        ) : null}
 
-      {activeView === "diagnostics" ? (
-        <DiagnosticsView
-          state={state.clashSpeedtest}
-          sites={state.sites}
-          onSelectBinary={selectClashSpeedtestBinary}
-          onSetBinaryPath={setClashSpeedtestBinaryPath}
-          onResetBinaryPath={resetClashSpeedtestBinaryPath}
-          onSaveSites={saveTestSites}
-        />
-      ) : null}
+        {activeView === "diagnostics" ? (
+          <DiagnosticsView
+            state={state.clashSpeedtest}
+            sites={state.sites}
+            onSelectBinary={selectClashSpeedtestBinary}
+            onSetBinaryPath={setClashSpeedtestBinaryPath}
+            onResetBinaryPath={resetClashSpeedtestBinaryPath}
+            onSaveSites={saveTestSites}
+          />
+        ) : null}
+      </div>
     </main>
   );
 
