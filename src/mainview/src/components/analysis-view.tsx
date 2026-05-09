@@ -194,8 +194,8 @@ export function AnalysisView({
                           dataKey="proxyName"
                           tickLine={false}
                           axisLine={false}
-                          tickMargin={12}
-                          width={232}
+                          tickMargin={8}
+                          width={220}
                           tick={<ChartYAxisTick />}
                         />
                         <Tooltip
@@ -414,14 +414,16 @@ function ChartYAxisTick({
   payload?: { value?: string };
 }) {
   const label = payload?.value ?? "";
-  const width = 220;
+  const width = 208;
 
   return (
     <g>
       <title>{label}</title>
-      <foreignObject x={x - width - 12} y={y - 12} width={width} height={24}>
-        <div className="overflow-hidden text-ellipsis whitespace-nowrap pr-1 text-left text-xs font-medium leading-6 text-foreground">
-          {label}
+      <foreignObject x={x - width - 8} y={y - 12} width={width} height={24}>
+        <div className="flex h-6 justify-end pr-1">
+          <span className="min-w-0 max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-left text-xs font-medium leading-6 text-foreground">
+            {label}
+          </span>
         </div>
       </foreignObject>
     </g>
