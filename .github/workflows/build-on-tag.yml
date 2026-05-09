@@ -9,19 +9,9 @@ permissions:
   contents: write
 
 jobs:
-  build:
-    name: Build on ${{ matrix.label }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: macos-14
-            label: macOS
-            asset_suffix: macos-arm64
-          - os: windows-latest
-            label: Windows
-            asset_suffix: windows-x64
+  verify:
+    name: Verify project
+    runs-on: macos-14
 
     steps:
       - name: Check out repository
@@ -50,6 +40,33 @@ jobs:
 
       - name: Run typecheck
         run: bun run typecheck
+
+  build:
+    name: Build on ${{ matrix.label }}
+    needs: verify
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            label: macOS
+            asset_suffix: macos-arm64
+          - os: windows-latest
+            label: Windows
+            asset_suffix: windows-x64
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
 
       - name: Build app
         run: bun run build
