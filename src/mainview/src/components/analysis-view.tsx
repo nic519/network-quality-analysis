@@ -122,7 +122,7 @@ export function AnalysisView({
                   type="date"
                   value={fromDate}
                   onChange={(event) => onFromDateChange(event.target.value)}
-                  className="w-[142px]"
+                  className="h-8 w-[132px] rounded-none border-0 border-b border-input bg-transparent px-0 py-0 text-sm shadow-none focus-visible:ring-0"
                 />
               </label>
               <label className="flex items-center gap-2">
@@ -131,7 +131,7 @@ export function AnalysisView({
                   type="date"
                   value={toDate}
                   onChange={(event) => onToDateChange(event.target.value)}
-                  className="w-[142px]"
+                  className="h-8 w-[132px] rounded-none border-0 border-b border-input bg-transparent px-0 py-0 text-sm shadow-none focus-visible:ring-0"
                 />
               </label>
               <label className="relative min-w-[220px] max-w-[320px] flex-1">
@@ -144,36 +144,38 @@ export function AnalysisView({
                 />
               </label>
 
-              <Button className="ml-auto shrink-0" variant="outline" onClick={onCopyResults} disabled={!state.results.length}>
-                <Copy className="h-4 w-4" />
-                复制结果
-              </Button>
             </div>
             {error ? <div className="mt-2 text-sm text-red-300">{error}</div> : null}
           </div>
 
           <div className="min-w-0 px-5 py-5">
             <section className="min-w-0">
-              <div className="mb-3 flex flex-wrap items-center gap-1.5">
-                {selectableSites.map((site) => {
-                  const active = site.id === selectedSite?.id;
-                  return (
-                    <Button
-                      key={site.id}
-                      type="button"
-                      variant="ghost"
-                      className={cn(
-                        "h-8 rounded-md px-3 text-sm",
-                        active
-                          ? "bg-accent text-accent-foreground hover:bg-accent"
-                          : "text-muted-foreground hover:bg-accent/65 hover:text-foreground",
-                      )}
-                      onClick={() => onSelectedSiteIdChange(site.id)}
-                    >
-                      {site.name}
-                    </Button>
-                  );
-                })}
+              <div className="mb-3 flex min-w-0 flex-wrap items-center gap-2">
+                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+                  {selectableSites.map((site) => {
+                    const active = site.id === selectedSite?.id;
+                    return (
+                      <Button
+                        key={site.id}
+                        type="button"
+                        variant="ghost"
+                        className={cn(
+                          "h-8 rounded-md px-3 text-sm",
+                          active
+                            ? "bg-accent text-accent-foreground hover:bg-accent"
+                            : "text-muted-foreground hover:bg-accent/65 hover:text-foreground",
+                        )}
+                        onClick={() => onSelectedSiteIdChange(site.id)}
+                      >
+                        {site.name}
+                      </Button>
+                    );
+                  })}
+                </div>
+                <Button className="ml-auto shrink-0" variant="outline" onClick={onCopyResults} disabled={!state.results.length}>
+                  <Copy className="h-4 w-4" />
+                  复制结果
+                </Button>
               </div>
 
               <div className="h-[420px] rounded-md border border-border bg-card/45 px-3 py-3">
