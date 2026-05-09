@@ -17,15 +17,20 @@ export function ClashSpeedtestQuickStatus({ state }: { state: ClashSpeedtestStat
   );
 }
 
-export function ClashSpeedtestDiagnosticsPanel({ state }: { state: ClashSpeedtestState }) {
+export function ClashSpeedtestInlineStatus({ state }: { state: ClashSpeedtestState }) {
   const Icon = getClashSpeedtestStatusIcon(state);
 
   return (
+    <div className="flex items-center gap-2 text-sm text-secondary-foreground">
+      <Icon className={cn("h-4 w-4", getStatusTone(state), isBusy(state) ? "animate-spin" : "")} />
+      <span>{getDetailedStatusLabel(state)}</span>
+    </div>
+  );
+}
+
+export function ClashSpeedtestDiagnosticsPanel({ state }: { state: ClashSpeedtestState }) {
+  return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-2 text-sm text-secondary-foreground">
-        <Icon className={cn("h-4 w-4", getStatusTone(state), isBusy(state) ? "animate-spin" : "")} />
-        <span>{getDetailedStatusLabel(state)}</span>
-      </div>
       <div className="text-sm text-muted-foreground">{getDiagnosticsSummary(state)}</div>
       {state.path ? <div className="break-all rounded-md border border-border bg-secondary/35 px-3 py-2 text-sm text-secondary-foreground">{state.path}</div> : null}
     </div>

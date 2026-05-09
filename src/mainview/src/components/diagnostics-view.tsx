@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Check, ChevronDown, Copy, Download, FolderOpen, Plus, RotateCcw, Save, Trash2, X } from "lucide-react";
-import { ClashSpeedtestDiagnosticsPanel } from "./clash-speedtest-status";
+import { ClashSpeedtestInlineStatus, getDiagnosticsSummary } from "./clash-speedtest-status";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { DEFAULT_SITES } from "../../../shared/domain";
@@ -133,7 +133,10 @@ export function DiagnosticsView({
           </section>
 
           <section className="grid gap-3 py-5">
-            <h2 className="text-sm font-semibold text-foreground">依赖</h2>
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-sm font-semibold text-foreground">依赖</h2>
+              <ClashSpeedtestInlineStatus state={state} />
+            </div>
             <div className="flex items-center gap-2 rounded-md border border-border bg-secondary/35 px-3 py-2">
               <div className="min-w-0 flex-1 overflow-x-auto font-mono text-sm text-secondary-foreground">
                 <div className="w-max min-w-full">{GO_INSTALL_COMMAND}</div>
@@ -153,7 +156,7 @@ export function DiagnosticsView({
                 {didCopyInstallCommand ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
               </Button>
             </div>
-            <ClashSpeedtestDiagnosticsPanel state={state} />
+            {state.path ? <div className="break-all rounded-md border border-border bg-secondary/35 px-3 py-2 text-sm text-secondary-foreground">{state.path}</div> : null}
           </section>
 
           <section className="py-5">
@@ -174,7 +177,7 @@ export function DiagnosticsView({
               <summary className="flex cursor-pointer list-none items-center justify-between rounded-md px-2 py-2 text-left hover:bg-accent/65">
                 <div>
                   <div className="text-sm font-semibold text-foreground">开发调试</div>
-                  <div className="mt-1 text-xs text-muted-foreground">手动指定路径，或切回系统命令依赖。</div>
+                  <div className="mt-1 text-xs text-muted-foreground">{getDiagnosticsSummary(state)} 手动指定路径，或切回系统命令依赖。</div>
                 </div>
                 <ChevronDown className="h-4 w-4 text-muted-foreground" />
               </summary>
