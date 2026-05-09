@@ -26,6 +26,7 @@ describe("normalizeSiteDefinitions", () => {
           id: "",
           name: "  OpenAI Status  ",
           url: " https://status.openai.com ",
+          enabled: false,
         },
       ]),
     ).toEqual([
@@ -33,6 +34,18 @@ describe("normalizeSiteDefinitions", () => {
         id: "openai-status",
         name: "OpenAI Status",
         url: "https://status.openai.com",
+        enabled: false,
+      },
+    ]);
+  });
+
+  test("defaults legacy site entries to enabled", () => {
+    expect(normalizeSiteDefinitions([{ id: "example", name: "Example", url: "https://example.com" }])).toEqual([
+      {
+        id: "example",
+        name: "Example",
+        url: "https://example.com",
+        enabled: true,
       },
     ]);
   });

@@ -128,7 +128,8 @@ function createPreviewApi() {
       return { cleared: true };
     },
     setTestSites: async ({ sites }: SetTestSitesParams) => {
-      progressHandler?.(`浏览器预览模式：已保存 ${sites.length} 个测试网站`);
+      const enabledSiteCount = sites.filter((site) => site.enabled !== false).length;
+      progressHandler?.(`浏览器预览模式：已保存 ${sites.length} 个测试网站，其中 ${enabledSiteCount} 个已启用`);
       sample.sites = sites;
       return sites;
     },

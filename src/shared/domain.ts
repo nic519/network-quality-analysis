@@ -9,6 +9,7 @@ export type SiteDefinition = {
   id: string;
   name: string;
   url: string;
+  enabled?: boolean;
 };
 
 export type SpeedtestRow = {
@@ -88,16 +89,19 @@ export const DEFAULT_SITES: SiteDefinition[] = [
     id: "youtube",
     name: "YouTube",
     url: "https://www.youtube.com/generate_204",
+    enabled: true,
   },
   {
     id: "x",
     name: "X",
     url: "https://x.com",
+    enabled: true,
   },
   {
     id: "github",
     name: "GitHub",
     url: "https://github.com",
+    enabled: true,
   },
 ];
 
@@ -107,11 +111,15 @@ export function normalizeSiteDefinitions(sites: SiteDefinition[]): SiteDefinitio
       const name = site.name.trim();
       const url = site.url.trim();
       const id = (site.id.trim() || slugifySiteId(name || url)).slice(0, 80);
-      return { id, name, url };
+      return { id, name, url, enabled: site.enabled !== false };
     })
     .filter((site) => site.name && /^https?:\/\//i.test(site.url));
 
   return normalized.length ? dedupeSiteIds(normalized) : DEFAULT_SITES;
+}
+
+export function enabledSiteDefinitions(sites: SiteDefinition[]): SiteDefinition[] {
+  return sites.filter((site) => site.enabled !== false);
 }
 
 export function parseTSVOutput(raw: string): SpeedtestRow[] {

@@ -49,7 +49,7 @@ export function DiagnosticsView({
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <CardTitle className="text-xl">测试网站</CardTitle>
-              <div className="mt-1 text-sm text-stone-400">每个地区都会依次测试这些站点的延迟 URL。</div>
+              <div className="mt-1 text-sm text-stone-400">勾选启用的网站会参与测试，未勾选的网站会保留但跳过。</div>
             </div>
             <div className="flex flex-wrap gap-2">
               <Button type="button" variant="outline" onClick={() => setDraftSites([...draftSites, createBlankSite()])}>
@@ -65,7 +65,17 @@ export function DiagnosticsView({
         </CardHeader>
         <CardContent className="grid gap-3 pt-4">
           {draftSites.map((site, index) => (
-            <div key={`${site.id}-${index}`} className="grid gap-2 rounded-2xl border border-stone-800 bg-black/20 p-3 lg:grid-cols-[180px_minmax(0,1fr)_auto] lg:items-center">
+            <div key={`${site.id}-${index}`} className="grid gap-2 rounded-2xl border border-stone-800 bg-black/20 p-3 lg:grid-cols-[96px_180px_minmax(0,1fr)_auto] lg:items-center">
+              <label className="inline-flex h-10 items-center gap-2 rounded-lg border border-stone-800 bg-stone-950/70 px-3 text-sm text-stone-200">
+                <input
+                  type="checkbox"
+                  checked={site.enabled !== false}
+                  onChange={(event) => updateDraftSite(index, { enabled: event.target.checked })}
+                  className="h-4 w-4 accent-emerald-400"
+                  aria-label={`测试网站 ${index + 1} 是否启用`}
+                />
+                启用
+              </label>
               <Input
                 value={site.name}
                 onChange={(event) => updateDraftSite(index, { name: event.target.value })}
@@ -90,7 +100,7 @@ export function DiagnosticsView({
             </div>
           ))}
           <div className="flex flex-col gap-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100 sm:flex-row sm:items-center sm:justify-between">
-            <span>保存后，后续测试会使用这些网站；历史结果仍保留当时的网站名称。</span>
+            <span>保存后，后续测试只会使用已启用的网站；历史结果仍保留当时的网站名称。</span>
             <Button type="button" className="shrink-0" onClick={() => onSaveSites(draftSites)}>
               保存网站
               <Save className="ml-2 h-4 w-4" />
@@ -164,5 +174,6 @@ function createBlankSite(): SiteDefinition {
     id: "",
     name: "",
     url: "",
+    enabled: true,
   };
 }

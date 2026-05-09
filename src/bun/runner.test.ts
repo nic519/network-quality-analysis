@@ -90,6 +90,38 @@ describe("runLatencyTest", () => {
     expect(output.results).toHaveLength(1);
   });
 
+  test("skips disabled configured sites", async () => {
+    const root = join(tmpdir(), `latency-runner-disabled-sites-${Date.now()}`);
+    const binaryPath = join(root, "clash-speedtest");
+    const configPath = join(root, "config.yaml");
+    mkdirSync(root, { recursive: true });
+    writeFileSync(binaryPath, "");
+    writeFileSync(configPath, "");
+    const calls: string[][] = [];
+    const output = await runLatencyTest(
+      {
+        configPath,
+        regionIds: ["hong-kong"],
+      },
+      {
+        binaryPath,
+        sites: [
+          { ...site, enabled: false },
+          { id: "github", name: "GitHub", url: "https://github.com", enabled: true },
+        ],
+        now: () => new Date("2026-05-07T10:00:00.000Z"),
+        execute: async (_binary, args) => {
+          calls.push(args);
+          return "序号\t节点名称\t类型\t延迟\n1.\tHK-01\tTrojan\t128ms\n";
+        },
+      },
+    );
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toContain("https://github.com");
+    expect(output.results.map((row) => row.siteName)).toEqual(["GitHub"]);
+  });
+
   test("creates one completed run per selected region", async () => {
     const root = join(tmpdir(), `latency-runner-regions-${Date.now()}`);
     const binaryPath = join(root, "clash-speedtest");

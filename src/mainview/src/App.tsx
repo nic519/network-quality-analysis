@@ -199,8 +199,9 @@ export default function App() {
     setError(null);
     try {
       const savedSites = await api.setTestSites({ sites });
+      const enabledSiteCount = savedSites.filter((site) => site.enabled !== false).length;
       setState((current) => ({ ...current, sites: savedSites }));
-      setProgress(`已保存 ${savedSites.length} 个测试网站`);
+      setProgress(`已保存 ${savedSites.length} 个测试网站，其中 ${enabledSiteCount} 个已启用`);
     } catch (caught) {
       setError(toErrorMessage(caught));
     }

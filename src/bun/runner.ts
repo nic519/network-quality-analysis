@@ -4,6 +4,7 @@ import {
   DEFAULT_SITES,
   REGION_PRESETS,
   createRunId,
+  enabledSiteDefinitions,
   parseTSVOutput,
   type RegionPreset,
   type ResultRow,
@@ -62,7 +63,10 @@ export async function runLatencyTest(request: RunRequest, options: RunnerOptions
     }));
   validateBinaryInput(binaryPath);
   const execute = options.execute ?? executeSpeedtest;
-  const sites = options.sites ?? DEFAULT_SITES;
+  const sites = enabledSiteDefinitions(options.sites ?? DEFAULT_SITES);
+  if (!sites.length) {
+    throw new Error("请至少启用一个测试网站");
+  }
   const selectedRegions = REGION_PRESETS.filter((region) => request.regionIds.includes(region.id));
   const runs: RunRecord[] = [];
   const results: ResultRow[] = [];
