@@ -7,7 +7,7 @@ Electrobun desktop app for testing website latency through `clash-speedtest`.
 - React UI with shadcn/ui-style components
 - Electrobun desktop shell
 - Built-in region presets: Hong Kong and Japan
-- Built-in sites: YouTube, X, GitHub
+- Configurable test sites with YouTube, X, and GitHub as defaults
 - Guides users to install `clash-speedtest` with `go install github.com/nic519/clash-speedtest@latest`
 - Stores history in SQLite at `~/Library/Application Support/Latency Compass/latency-compass.sqlite`
 - Shows summary cards and a node-by-site latency matrix

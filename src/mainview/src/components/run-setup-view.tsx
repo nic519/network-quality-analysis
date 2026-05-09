@@ -124,6 +124,10 @@ export function RunSetupView({
                     ))}
                   </div>
                 </div>
+                <div className="rounded-xl border border-stone-800 bg-stone-950/50 px-3 py-2 text-xs text-stone-400">
+                  当前会测试 {state.sites.length} 个网站：
+                  <span className="text-stone-200"> {state.sites.map((site) => site.name).join("、")}</span>
+                </div>
               </div>
             </div>
 

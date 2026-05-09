@@ -322,7 +322,7 @@ function bestLatency(values: Record<string, string>) {
 
 function getDiagnosticsHint(state: AppState["clashSpeedtest"]) {
   if (state.status === "error") return state.message;
-  if (state.status === "missing") return "未检测到本地 clash-speedtest，请先运行 go install 或在依赖页指定路径。";
+  if (state.status === "missing") return "未检测到本地 clash-speedtest，请先运行 go install 或在设置页指定路径。";
   return null;
 }
 

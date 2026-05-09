@@ -9,7 +9,7 @@ export type AppView = "run" | "analysis" | "diagnostics";
 const viewItems: Array<{ id: AppView; label: string; icon: typeof PlayCircle }> = [
   { id: "run", label: "执行测试", icon: PlayCircle },
   { id: "analysis", label: "结果分析", icon: BarChart3 },
-  { id: "diagnostics", label: "依赖", icon: Wrench },
+  { id: "diagnostics", label: "设置", icon: Wrench },
 ];
 
 export function TopNavigation({
