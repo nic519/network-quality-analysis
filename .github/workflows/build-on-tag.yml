@@ -86,12 +86,12 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path release-assets | Out-Null
-          $buildDir = Get-ChildItem build -Directory | Select-Object -First 1
-          if (-not $buildDir) {
-            throw "No build output directory found under build/"
+          $artifact = Get-ChildItem artifacts -File -Filter '*.zip' | Select-Object -First 1
+          if (-not $artifact) {
+            throw "No Windows zip artifact found under artifacts/"
           }
           $assetName = "latency-compass-${env:GITHUB_REF_NAME}-${{ matrix.asset_suffix }}.zip"
-          Compress-Archive -Path "$($buildDir.FullName)\*" -DestinationPath "release-assets\$assetName" -Force
+          Copy-Item -Path $artifact.FullName -Destination "release-assets\$assetName"
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
