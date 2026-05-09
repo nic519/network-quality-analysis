@@ -248,7 +248,6 @@ export default function App() {
             onSelectedSiteIdChange={setSelectedSiteId}
             error={error}
             onCopyResults={copyResults}
-            onExportAllResults={exportAllResults}
           />
         ) : null}
 
@@ -260,6 +259,8 @@ export default function App() {
             onSetBinaryPath={setClashSpeedtestBinaryPath}
             onResetBinaryPath={resetClashSpeedtestBinaryPath}
             onSaveSites={saveTestSites}
+            onExportAllResults={exportAllResults}
+            canExportResults={Boolean(state.results.length)}
           />
         ) : null}
       </div>

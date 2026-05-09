@@ -1,4 +1,4 @@
-import { Circle, CircleDot, Copy, Download, Search } from "lucide-react";
+import { Circle, CircleDot, Copy, Search } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
@@ -26,7 +26,6 @@ export function AnalysisView({
   onSelectedSiteIdChange,
   error,
   onCopyResults,
-  onExportAllResults,
 }: {
   state: AppState;
   selectedRunId: string;
@@ -41,7 +40,6 @@ export function AnalysisView({
   onSelectedSiteIdChange: (value: string) => void;
   error: string | null;
   onCopyResults: () => void;
-  onExportAllResults: () => void;
 }) {
   const selectableSites = buildSelectableSites(state.sites, state.results);
   const selectedSite = selectableSites.find((site) => site.id === selectedSiteId) ?? selectableSites[0];
@@ -116,51 +114,37 @@ export function AnalysisView({
         </aside>
 
         <div className="flex min-h-0 min-w-0 flex-col">
-          <div className="shrink-0 border-b border-border px-5 py-3">
-            <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
-              <div className="flex min-w-0 flex-1 flex-wrap items-end gap-3">
-                  <label className="space-y-1">
-                    <span className="text-[11px] font-medium text-muted-foreground">From</span>
-                    <Input
-                      type="date"
-                      value={fromDate}
-                      onChange={(event) => onFromDateChange(event.target.value)}
-                      className="w-[160px]"
-                    />
-                  </label>
-                  <label className="space-y-1">
-                    <span className="text-[11px] font-medium text-muted-foreground">To</span>
-                    <Input
-                      type="date"
-                      value={toDate}
-                      onChange={(event) => onToDateChange(event.target.value)}
-                      className="w-[160px]"
-                    />
-                  </label>
-                  <label className="relative w-full max-w-[300px] space-y-1">
-                    <span className="text-[11px] font-medium text-muted-foreground">Search</span>
-                    <Search className="pointer-events-none absolute left-3 top-[31px] h-4 w-4 text-muted-foreground" />
-                    <Input
-                      value={search}
-                      onChange={(event) => onSearchChange(event.target.value)}
-                      placeholder="搜索节点名称"
-                      className="pl-9"
-                    />
-                  </label>
-                </div>
+          <div className="shrink-0 border-b border-border px-5 py-2">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <label className="flex items-center gap-2">
+                <span className="text-[11px] font-medium text-muted-foreground">From</span>
+                <Input
+                  type="date"
+                  value={fromDate}
+                  onChange={(event) => onFromDateChange(event.target.value)}
+                  className="w-[142px]"
+                />
+              </label>
+              <label className="flex items-center gap-2">
+                <span className="text-[11px] font-medium text-muted-foreground">To</span>
+                <Input
+                  type="date"
+                  value={toDate}
+                  onChange={(event) => onToDateChange(event.target.value)}
+                  className="w-[142px]"
+                />
+              </label>
+              <label className="relative min-w-[220px] max-w-[320px] flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={search}
+                  onChange={(event) => onSearchChange(event.target.value)}
+                  placeholder="搜索节点名称"
+                  className="pl-9"
+                />
+              </label>
 
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button variant="outline" onClick={onCopyResults} disabled={!state.results.length}>
-                    <Copy className="h-4 w-4" />
-                    复制结果
-                  </Button>
-                  <Button variant="outline" onClick={onExportAllResults} disabled={!state.results.length}>
-                    <Download className="h-4 w-4" />
-                    导出所有结果
-                  </Button>
-                </div>
-              </div>
-              <div className="mt-3 flex flex-wrap items-center gap-1.5">
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
                 {selectableSites.map((site) => {
                   const active = site.id === selectedSite?.id;
                   return (
@@ -181,7 +165,12 @@ export function AnalysisView({
                   );
                 })}
               </div>
-              {error ? <div className="mt-3 text-sm text-red-300">{error}</div> : null}
+              <Button className="ml-auto shrink-0" variant="outline" onClick={onCopyResults} disabled={!state.results.length}>
+                <Copy className="h-4 w-4" />
+                复制结果
+              </Button>
+            </div>
+            {error ? <div className="mt-2 text-sm text-red-300">{error}</div> : null}
           </div>
 
           <div className="custom-scrollbar min-h-0 min-w-0 flex-1 overflow-y-auto px-5 py-5">
