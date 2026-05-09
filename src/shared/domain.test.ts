@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { REGION_PRESETS, latencyStatus, latencyToMs, parseTSVOutput } from "./domain";
+import { DEFAULT_SITES, REGION_PRESETS, latencyStatus, latencyToMs, normalizeSiteDefinitions, parseTSVOutput } from "./domain";
 
 describe("region presets", () => {
   test("exposes built-in location presets without user-authored filters", () => {
@@ -15,6 +15,30 @@ describe("region presets", () => {
     expect(REGION_PRESETS.find((region) => region.id === "japan")?.filterRegex).toContain("Japan");
     expect(REGION_PRESETS.find((region) => region.id === "united-states")?.filterRegex).toContain("United States");
     expect(REGION_PRESETS.find((region) => region.id === "taiwan")?.filterRegex).toContain("Taiwan");
+  });
+});
+
+describe("normalizeSiteDefinitions", () => {
+  test("trims configured test sites and derives stable ids", () => {
+    expect(
+      normalizeSiteDefinitions([
+        {
+          id: "",
+          name: "  OpenAI Status  ",
+          url: " https://status.openai.com ",
+        },
+      ]),
+    ).toEqual([
+      {
+        id: "openai-status",
+        name: "OpenAI Status",
+        url: "https://status.openai.com",
+      },
+    ]);
+  });
+
+  test("falls back to default sites when no configured site is usable", () => {
+    expect(normalizeSiteDefinitions([{ id: "", name: "Only name", url: "" }])).toEqual(DEFAULT_SITES);
   });
 });
 

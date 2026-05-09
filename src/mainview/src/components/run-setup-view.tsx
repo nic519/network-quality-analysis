@@ -1,9 +1,9 @@
-import { useLayoutEffect, useRef, useState } from "react";
 import { Check, FileSearch, Loader2, Play } from "lucide-react";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
 import { Input } from "./ui/input";
+import { ScrollArea } from "./ui/scroll-area";
 import { cn } from "../lib/utils";
 import type { AppState } from "../../../shared/rpc";
 
@@ -173,116 +173,16 @@ export function RunSetupView({
 }
 
 function TerminalLog({ messages }: { messages: string[] }) {
-  const scrollAreaRef = useRef<HTMLDivElement | null>(null);
-  const thumbRef = useRef<HTMLDivElement | null>(null);
-  const dragStateRef = useRef<{ pointerId: number; startY: number; startScrollTop: number } | null>(null);
-  const [scrollState, setScrollState] = useState({ canScroll: false, thumbTop: 0, thumbHeight: 100 });
-
-  const updateScrollState = () => {
-    const scrollArea = scrollAreaRef.current;
-    if (!scrollArea) return;
-
-    const { clientHeight, scrollHeight, scrollTop } = scrollArea;
-    const canScroll = scrollHeight > clientHeight + 1;
-    const thumbHeight = canScroll ? Math.max(34, (clientHeight / scrollHeight) * 100) : 100;
-    const maxThumbTop = 100 - thumbHeight;
-    const thumbTop = canScroll ? (scrollTop / (scrollHeight - clientHeight)) * maxThumbTop : 0;
-
-    setScrollState({ canScroll, thumbTop, thumbHeight });
-  };
-
-  useLayoutEffect(() => {
-    updateScrollState();
-    const scrollArea = scrollAreaRef.current;
-    if (!scrollArea) return;
-
-    const resizeObserver = new ResizeObserver(updateScrollState);
-    resizeObserver.observe(scrollArea);
-    resizeObserver.observe(scrollArea.firstElementChild ?? scrollArea);
-
-    return () => resizeObserver.disconnect();
-  }, [messages]);
-
-  const scrollToTrackPosition = (clientY: number) => {
-    const scrollArea = scrollAreaRef.current;
-    const track = thumbRef.current?.parentElement;
-    if (!scrollArea || !track) return;
-
-    const trackRect = track.getBoundingClientRect();
-    const targetRatio =
-      (clientY - trackRect.top - trackRect.height * (scrollState.thumbHeight / 100) * 0.5) / trackRect.height;
-    scrollArea.scrollTop = targetRatio * scrollArea.scrollHeight;
-    updateScrollState();
-  };
-
   return (
-    <div className="relative rounded-lg border border-stone-800 bg-black/25">
-      <div
-        ref={scrollAreaRef}
-        className="terminal-log-scroll-area max-h-[340px] min-h-[180px] overflow-auto p-3 pr-7 font-mono text-xs leading-6 text-stone-400"
-        onScroll={updateScrollState}
-      >
-        <div>
-          {messages.map((message, index) => (
-            <div key={`${index}-${message}`}>{message}</div>
-          ))}
-        </div>
-      </div>
-
-      {scrollState.canScroll ? (
-        <div
-          aria-hidden="true"
-          className="absolute bottom-3 right-2 top-3 w-2 rounded-full bg-stone-900/80 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]"
-          onPointerDown={(event) => scrollToTrackPosition(event.clientY)}
-        >
-          <div
-            ref={thumbRef}
-            className="absolute left-0 w-full rounded-full bg-emerald-300/45 shadow-[inset_0_0_0_1px_rgba(209,250,229,0.18)] transition-colors hover:bg-emerald-200/60"
-            style={{
-              height: `${scrollState.thumbHeight}%`,
-              top: `${scrollState.thumbTop}%`,
-            }}
-            onPointerDown={(event) => {
-              const scrollArea = scrollAreaRef.current;
-              if (!scrollArea) return;
-
-              event.stopPropagation();
-              thumbRef.current?.setPointerCapture(event.pointerId);
-              dragStateRef.current = {
-                pointerId: event.pointerId,
-                startY: event.clientY,
-                startScrollTop: scrollArea.scrollTop,
-              };
-            }}
-            onPointerMove={(event) => {
-              const scrollArea = scrollAreaRef.current;
-              const track = thumbRef.current?.parentElement;
-              const dragState = dragStateRef.current;
-              if (!scrollArea || !track || !dragState || dragState.pointerId !== event.pointerId) return;
-
-              const trackHeight = track.getBoundingClientRect().height;
-              const availableTrack = trackHeight * (1 - scrollState.thumbHeight / 100);
-              const availableScroll = scrollArea.scrollHeight - scrollArea.clientHeight;
-              const scrollPerPixel = availableTrack > 0 ? availableScroll / availableTrack : 0;
-              scrollArea.scrollTop = dragState.startScrollTop + (event.clientY - dragState.startY) * scrollPerPixel;
-              updateScrollState();
-            }}
-            onPointerUp={(event) => {
-              if (dragStateRef.current?.pointerId === event.pointerId) {
-                dragStateRef.current = null;
-                thumbRef.current?.releasePointerCapture(event.pointerId);
-              }
-            }}
-            onPointerCancel={(event) => {
-              if (dragStateRef.current?.pointerId === event.pointerId) {
-                dragStateRef.current = null;
-                thumbRef.current?.releasePointerCapture(event.pointerId);
-              }
-            }}
-          />
-        </div>
-      ) : null}
-    </div>
+    <ScrollArea
+      className="rounded-lg border border-stone-800 bg-black/25"
+      viewportClassName="max-h-[340px] min-h-[180px] p-3 font-mono text-xs leading-6 text-stone-400"
+      contentClassName="space-y-0"
+    >
+      {messages.map((message, index) => (
+        <div key={`${index}-${message}`}>{message}</div>
+      ))}
+    </ScrollArea>
   );
 }
 

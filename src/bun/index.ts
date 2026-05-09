@@ -8,17 +8,19 @@ import { chooseClashSpeedtestBinary, chooseConfigFile, chooseExportDirectory } f
 import { buildApplicationMenu } from "./menu";
 import { runLatencyTest } from "./runner";
 import { getClashSpeedtestState, makeClashSpeedtestState } from "./clash-speedtest";
-import { REGION_PRESETS, type HistoryFilters } from "../shared/domain";
+import { DEFAULT_SITES, REGION_PRESETS, normalizeSiteDefinitions, type HistoryFilters, type SiteDefinition } from "../shared/domain";
 import { APP_RPC_TIMEOUT_MS, type AppRPC, type ClashSpeedtestState } from "../shared/rpc";
 
 const appDir = join(homedir(), "Library/Application Support/Latency Compass");
 mkdirSync(appDir, { recursive: true });
 const manualBinaryPathFile = join(appDir, "clash-speedtest-manual-path.txt");
+const testSitesFile = join(appDir, "test-sites.json");
 
 const db = new LatencyDatabase(join(appDir, "latency-compass.sqlite"));
 db.migrate();
 ApplicationMenu.setApplicationMenu(buildApplicationMenu());
 let manualClashSpeedtestPath = loadManualClashSpeedtestPath();
+let testSites = loadTestSites();
 let clashSpeedtestState = makeClashSpeedtestState({
   status: "missing",
   checkedAt: new Date().toISOString(),
@@ -80,6 +82,11 @@ const rpc = BrowserView.defineRPC<AppRPC>({
         );
         return { cleared: true };
       },
+      setTestSites: async ({ sites }) => {
+        testSites = normalizeSiteDefinitions(sites);
+        await Bun.write(testSitesFile, JSON.stringify(testSites, null, 2));
+        return testSites;
+      },
       openExternalUrl: async ({ url }) => {
         await openExternalUrl(url);
         return null;
@@ -101,6 +108,7 @@ const rpc = BrowserView.defineRPC<AppRPC>({
             { configPath, regionIds },
             {
               binaryPath: manualClashSpeedtestPath && existsSync(manualClashSpeedtestPath) ? manualClashSpeedtestPath : undefined,
+              sites: testSites,
               onProgress: (message) => {
                 window.webview.rpc?.send.progress({ message });
               },
@@ -164,6 +172,7 @@ async function getAppState(filters: HistoryFilters = {}) {
   }
   return {
     regions: REGION_PRESETS,
+    sites: testSites,
     runs: db.listRuns(),
     results: db.queryResults(filters),
     configHistory: db.listConfigHistory(),
@@ -199,4 +208,15 @@ function loadManualClashSpeedtestPath() {
   if (!existsSync(manualBinaryPathFile)) return null;
   const content = readFileSync(manualBinaryPathFile, "utf8").trim();
   return content || null;
+}
+
+function loadTestSites(): SiteDefinition[] {
+  if (!existsSync(testSitesFile)) return DEFAULT_SITES;
+
+  try {
+    const parsed = JSON.parse(readFileSync(testSitesFile, "utf8")) as SiteDefinition[];
+    return normalizeSiteDefinitions(Array.isArray(parsed) ? parsed : []);
+  } catch {
+    return DEFAULT_SITES;
+  }
 }

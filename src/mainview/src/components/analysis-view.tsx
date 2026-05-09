@@ -1,15 +1,16 @@
-import { useLayoutEffect, useRef, useState } from "react";
 import { Circle, CircleDot, Copy, Download, Search } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { CardDescription, CardTitle } from "./ui/card";
 import { Input } from "./ui/input";
+import { ScrollArea } from "./ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import type { LatencyChartRow } from "../lib/chart-data";
 import { formatRunRegionLabels } from "../lib/run-region-label";
 import { cn } from "../lib/utils";
-import { DEFAULT_SITES, latencyToMs } from "../../../shared/domain";
+import { latencyToMs } from "../../../shared/domain";
+import type { SiteDefinition } from "../../../shared/domain";
 import type { AppState } from "../../../shared/rpc";
 
 export function AnalysisView({
@@ -43,7 +44,8 @@ export function AnalysisView({
   onCopyResults: () => void;
   onExportAllResults: () => void;
 }) {
-  const selectedSite = DEFAULT_SITES.find((site) => site.id === selectedSiteId) ?? DEFAULT_SITES[0];
+  const selectableSites = buildSelectableSites(state.sites, state.results);
+  const selectedSite = selectableSites.find((site) => site.id === selectedSiteId) ?? selectableSites[0];
   const runItems = state.runs.slice(0, 12);
   const scopedResults = filterScopedResults(state.results, selectedRunId);
   const chartRows = buildRunScopedChartRows(scopedResults, search, selectedSite?.name);
@@ -96,8 +98,12 @@ export function AnalysisView({
               </button>
             </div>
 
-            <div className="custom-scrollbar max-h-[calc(100vh-280px)] overflow-auto px-3 py-3" role="radiogroup" aria-label="运行批次">
-              <div className="space-y-2">
+            <ScrollArea
+              className="px-3 py-3"
+              viewportClassName="max-h-[calc(100vh-280px)]"
+              contentClassName="space-y-2"
+            >
+              <div role="radiogroup" aria-label="运行批次" className="space-y-2">
                 {runItems.map((run) => {
                   const isActive = selectedRunId === run.id;
                   return (
@@ -128,7 +134,7 @@ export function AnalysisView({
                   );
                 })}
               </div>
-            </div>
+            </ScrollArea>
           </aside>
 
           <div className="bg-[linear-gradient(180deg,rgba(20,20,18,0.96),rgba(12,12,11,0.98))]">
@@ -177,7 +183,7 @@ export function AnalysisView({
                 </div>
               </div>
               <div className="mt-4 flex flex-wrap items-center gap-2">
-                {DEFAULT_SITES.map((site) => {
+                {selectableSites.map((site) => {
                   const active = site.id === selectedSite?.id;
                   return (
                     <Button
@@ -272,51 +278,9 @@ export function AnalysisView({
 }
 
 function FailureTable({ rows }: { rows: ReturnType<typeof buildFailedSiteRows> }) {
-  const scrollAreaRef = useRef<HTMLDivElement | null>(null);
-  const thumbRef = useRef<HTMLDivElement | null>(null);
-  const dragStateRef = useRef<{ pointerId: number; startY: number; startScrollTop: number } | null>(null);
-  const [scrollState, setScrollState] = useState({ canScroll: false, thumbTop: 0, thumbHeight: 100 });
-
-  const updateScrollState = () => {
-    const scrollArea = scrollAreaRef.current;
-    if (!scrollArea) return;
-
-    const { clientHeight, scrollHeight, scrollTop } = scrollArea;
-    const canScroll = scrollHeight > clientHeight + 1;
-    const thumbHeight = canScroll ? Math.max(34, (clientHeight / scrollHeight) * 100) : 100;
-    const maxThumbTop = 100 - thumbHeight;
-    const thumbTop = canScroll ? (scrollTop / (scrollHeight - clientHeight)) * maxThumbTop : 0;
-
-    setScrollState({ canScroll, thumbTop, thumbHeight });
-  };
-
-  useLayoutEffect(() => {
-    updateScrollState();
-    const scrollArea = scrollAreaRef.current;
-    if (!scrollArea) return;
-
-    const resizeObserver = new ResizeObserver(updateScrollState);
-    resizeObserver.observe(scrollArea);
-    resizeObserver.observe(scrollArea.firstElementChild ?? scrollArea);
-
-    return () => resizeObserver.disconnect();
-  }, [rows]);
-
-  const scrollToTrackPosition = (clientY: number) => {
-    const scrollArea = scrollAreaRef.current;
-    const track = thumbRef.current?.parentElement;
-    if (!scrollArea || !track) return;
-
-    const trackRect = track.getBoundingClientRect();
-    const targetRatio =
-      (clientY - trackRect.top - trackRect.height * (scrollState.thumbHeight / 100) * 0.5) / trackRect.height;
-    scrollArea.scrollTop = targetRatio * scrollArea.scrollHeight;
-    updateScrollState();
-  };
-
   return (
-    <div className="relative mt-3 rounded-2xl border border-stone-800 bg-black/20">
-      <div ref={scrollAreaRef} className="terminal-log-scroll-area max-h-[260px] overflow-auto pr-7" onScroll={updateScrollState}>
+    <ScrollArea className="mt-3 rounded-2xl border border-stone-800 bg-black/20" viewportClassName="max-h-[260px]">
+      <div className="w-full">
         <Table>
           <TableHeader className="sticky top-0 z-10 bg-stone-950/95 backdrop-blur [&_tr]:border-stone-800">
             <TableRow className="hover:bg-transparent">
@@ -350,61 +314,7 @@ function FailureTable({ rows }: { rows: ReturnType<typeof buildFailedSiteRows> }
           </TableBody>
         </Table>
       </div>
-
-      {scrollState.canScroll ? (
-        <div
-          aria-hidden="true"
-          className="absolute bottom-3 right-2 top-3 w-2 rounded-full bg-stone-900/80 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]"
-          onPointerDown={(event) => scrollToTrackPosition(event.clientY)}
-        >
-          <div
-            ref={thumbRef}
-            className="absolute left-0 w-full rounded-full bg-emerald-300/45 shadow-[inset_0_0_0_1px_rgba(209,250,229,0.18)] transition-colors hover:bg-emerald-200/60"
-            style={{
-              height: `${scrollState.thumbHeight}%`,
-              top: `${scrollState.thumbTop}%`,
-            }}
-            onPointerDown={(event) => {
-              const scrollArea = scrollAreaRef.current;
-              if (!scrollArea) return;
-
-              event.stopPropagation();
-              thumbRef.current?.setPointerCapture(event.pointerId);
-              dragStateRef.current = {
-                pointerId: event.pointerId,
-                startY: event.clientY,
-                startScrollTop: scrollArea.scrollTop,
-              };
-            }}
-            onPointerMove={(event) => {
-              const scrollArea = scrollAreaRef.current;
-              const track = thumbRef.current?.parentElement;
-              const dragState = dragStateRef.current;
-              if (!scrollArea || !track || !dragState || dragState.pointerId !== event.pointerId) return;
-
-              const trackHeight = track.getBoundingClientRect().height;
-              const availableTrack = trackHeight * (1 - scrollState.thumbHeight / 100);
-              const availableScroll = scrollArea.scrollHeight - scrollArea.clientHeight;
-              const scrollPerPixel = availableTrack > 0 ? availableScroll / availableTrack : 0;
-              scrollArea.scrollTop = dragState.startScrollTop + (event.clientY - dragState.startY) * scrollPerPixel;
-              updateScrollState();
-            }}
-            onPointerUp={(event) => {
-              if (dragStateRef.current?.pointerId === event.pointerId) {
-                dragStateRef.current = null;
-                thumbRef.current?.releasePointerCapture(event.pointerId);
-              }
-            }}
-            onPointerCancel={(event) => {
-              if (dragStateRef.current?.pointerId === event.pointerId) {
-                dragStateRef.current = null;
-                thumbRef.current?.releasePointerCapture(event.pointerId);
-              }
-            }}
-          />
-        </div>
-      ) : null}
-    </div>
+    </ScrollArea>
   );
 }
 
@@ -458,6 +368,21 @@ function buildRunScopedChartRows(
 
 function filterScopedResults(results: AppState["results"], selectedRunId: string) {
   return selectedRunId === "all" ? results : results.filter((result) => result.runId === selectedRunId);
+}
+
+function buildSelectableSites(sites: SiteDefinition[], results: AppState["results"]) {
+  const siteMap = new Map<string, SiteDefinition>();
+  for (const site of sites) siteMap.set(site.id, site);
+  for (const result of results) {
+    if (!siteMap.has(result.siteId)) {
+      siteMap.set(result.siteId, {
+        id: result.siteId,
+        name: result.siteName,
+        url: result.siteUrl,
+      });
+    }
+  }
+  return [...siteMap.values()];
 }
 
 function buildFailedSiteRows(results: AppState["results"], search: string) {

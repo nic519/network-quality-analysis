@@ -101,6 +101,19 @@ export const DEFAULT_SITES: SiteDefinition[] = [
   },
 ];
 
+export function normalizeSiteDefinitions(sites: SiteDefinition[]): SiteDefinition[] {
+  const normalized = sites
+    .map((site) => {
+      const name = site.name.trim();
+      const url = site.url.trim();
+      const id = (site.id.trim() || slugifySiteId(name || url)).slice(0, 80);
+      return { id, name, url };
+    })
+    .filter((site) => site.name && /^https?:\/\//i.test(site.url));
+
+  return normalized.length ? dedupeSiteIds(normalized) : DEFAULT_SITES;
+}
+
 export function parseTSVOutput(raw: string): SpeedtestRow[] {
   const rows: SpeedtestRow[] = [];
   const lines = raw.replaceAll("\r\n", "\n").split("\n");
@@ -178,4 +191,22 @@ function extractProxyId(fields: string[]): string {
   if (fields.length === 8) return fields[7] ?? "";
   if (fields.length >= 9) return fields[8] ?? "";
   return legacyProxyId(fields[1] ?? "", fields[2] ?? "");
+}
+
+function slugifySiteId(value: string) {
+  const slug = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return slug || "site";
+}
+
+function dedupeSiteIds(sites: SiteDefinition[]) {
+  const counts = new Map<string, number>();
+  return sites.map((site) => {
+    const count = counts.get(site.id) ?? 0;
+    counts.set(site.id, count + 1);
+    return count === 0 ? site : { ...site, id: `${site.id}-${count + 1}` };
+  });
 }

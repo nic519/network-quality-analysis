@@ -1,5 +1,5 @@
 import { Electroview } from "electrobun/view";
-import { REGION_PRESETS, type HistoryFilters, type RegionPreset } from "../../../shared/domain";
+import { DEFAULT_SITES, REGION_PRESETS, type HistoryFilters, type RegionPreset } from "../../../shared/domain";
 import { APP_RPC_TIMEOUT_MS, type AppRPC } from "../../../shared/rpc";
 import type {
   AppState,
@@ -7,6 +7,7 @@ import type {
   ExportCsvResponse,
   ResetClashSpeedtestBinaryPathResponse,
   SetClashSpeedtestBinaryPathParams,
+  SetTestSitesParams,
   StartRunParams,
 } from "../../../shared/rpc";
 
@@ -48,6 +49,7 @@ export function onClashSpeedtestStatus(handler: ClashSpeedtestStatusHandler) {
 function createPreviewApi() {
   const sample: AppState = {
     regions: REGION_PRESETS,
+    sites: DEFAULT_SITES,
     configHistory: [
       {
         path: "/Users/nicholas/Library/Application Support/mihomo-party/profiles/config.yaml",
@@ -124,6 +126,11 @@ function createPreviewApi() {
     resetClashSpeedtestBinaryPath: async (): Promise<ResetClashSpeedtestBinaryPathResponse> => {
       progressHandler?.("浏览器预览模式：已切换回系统命令依赖");
       return { cleared: true };
+    },
+    setTestSites: async ({ sites }: SetTestSitesParams) => {
+      progressHandler?.(`浏览器预览模式：已保存 ${sites.length} 个测试网站`);
+      sample.sites = sites;
+      return sites;
     },
     openExternalUrl: async ({ url }: { url: string }) => {
       window.open(url, "_blank", "noopener,noreferrer");

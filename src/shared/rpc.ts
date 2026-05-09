@@ -1,10 +1,11 @@
 import type { RPCSchema } from "electrobun/bun";
-import type { HistoryFilters, RegionPreset, ResultRow, RunRecord } from "./domain";
+import type { HistoryFilters, RegionPreset, ResultRow, RunRecord, SiteDefinition } from "./domain";
 
 export const APP_RPC_TIMEOUT_MS = 10 * 60 * 1000;
 
 export type AppState = {
   regions: RegionPreset[];
+  sites: SiteDefinition[];
   runs: RunRecord[];
   results: ResultRow[];
   configHistory: ConfigHistoryItem[];
@@ -45,6 +46,10 @@ export type SetClashSpeedtestBinaryPathParams = {
   path: string;
 };
 
+export type SetTestSitesParams = {
+  sites: SiteDefinition[];
+};
+
 export type ResetClashSpeedtestBinaryPathResponse = {
   cleared: boolean;
 };
@@ -63,6 +68,7 @@ export type AppRPC = {
       selectClashSpeedtestBinary: { params: SelectClashSpeedtestBinaryParams; response: string | null };
       setClashSpeedtestBinaryPath: { params: SetClashSpeedtestBinaryPathParams; response: string | null };
       resetClashSpeedtestBinaryPath: { params: undefined; response: ResetClashSpeedtestBinaryPathResponse };
+      setTestSites: { params: SetTestSitesParams; response: SiteDefinition[] };
       openExternalUrl: { params: OpenExternalUrlParams; response: null };
       startRun: { params: StartRunParams; response: AppState };
       exportCsv: { params: HistoryFilters; response: ExportCsvResponse | null };

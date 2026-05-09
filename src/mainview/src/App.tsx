@@ -8,7 +8,7 @@ import { buildCopyResultsText } from "./lib/copy-results-text";
 import { api, onClashSpeedtestStatus, onProgress } from "./lib/electrobun";
 import { buildAnalysisHistoryFilters } from "./lib/history-filters";
 import { DEFAULT_SITES, REGION_PRESETS, latencyToMs } from "../../shared/domain";
-import type { RegionPreset } from "../../shared/domain";
+import type { RegionPreset, SiteDefinition } from "../../shared/domain";
 import type { AppState } from "../../shared/rpc";
 
 const today = new Date().toISOString().slice(0, 10);
@@ -16,6 +16,7 @@ const today = new Date().toISOString().slice(0, 10);
 export default function App() {
   const [state, setState] = useState<AppState>({
     regions: REGION_PRESETS,
+    sites: DEFAULT_SITES,
     configHistory: [],
     runs: [],
     results: [],
@@ -75,6 +76,13 @@ export default function App() {
       }
     });
   }, [filters]);
+
+  useEffect(() => {
+    const selectableSites = buildSelectableSites(state.sites, state.results);
+    if (!selectableSites.some((site) => site.id === selectedSiteId)) {
+      setSelectedSiteId(selectableSites[0]?.id ?? "");
+    }
+  }, [selectedSiteId, state.results, state.sites]);
 
   const recentConfigPaths = state.configHistory.filter((item) => item.path !== configPath);
   const diagnosticsHint = getDiagnosticsHint(state.clashSpeedtest);
@@ -187,6 +195,17 @@ export default function App() {
     }
   }
 
+  async function saveTestSites(sites: SiteDefinition[]) {
+    setError(null);
+    try {
+      const savedSites = await api.setTestSites({ sites });
+      setState((current) => ({ ...current, sites: savedSites }));
+      setProgress(`已保存 ${savedSites.length} 个测试网站`);
+    } catch (caught) {
+      setError(toErrorMessage(caught));
+    }
+  }
+
   return (
     <main className="min-h-screen overflow-hidden bg-background text-foreground">
       <section className="border-b border-white/10 px-8 py-5">
@@ -236,9 +255,11 @@ export default function App() {
       {activeView === "diagnostics" ? (
         <DiagnosticsView
           state={state.clashSpeedtest}
+          sites={state.sites}
           onSelectBinary={selectClashSpeedtestBinary}
           onSetBinaryPath={setClashSpeedtestBinaryPath}
           onResetBinaryPath={resetClashSpeedtestBinaryPath}
+          onSaveSites={saveTestSites}
         />
       ) : null}
     </main>
@@ -249,6 +270,21 @@ export default function App() {
       current.includes(regionId) ? current.filter((id) => id !== regionId) : [...current, regionId],
     );
   }
+}
+
+function buildSelectableSites(sites: SiteDefinition[], results: AppState["results"]) {
+  const siteMap = new Map<string, SiteDefinition>();
+  for (const site of sites) siteMap.set(site.id, site);
+  for (const result of results) {
+    if (!siteMap.has(result.siteId)) {
+      siteMap.set(result.siteId, {
+        id: result.siteId,
+        name: result.siteName,
+        url: result.siteUrl,
+      });
+    }
+  }
+  return [...siteMap.values()];
 }
 
 function buildMatrixRows(results: AppState["results"], search: string): MatrixRow[] {
