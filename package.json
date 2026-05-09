@@ -1,12 +1,13 @@
 {
   "name": "latency-compass",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "bun run build:css && electrobun dev",
     "dev:watch": "bun run build:css && electrobun dev --watch",
-    "build": "bun run build:css && electrobun build",
+    "build": "bun run build:css && ELECTROBUN_BUILD_ENV=stable electrobun build --env=stable",
+    "build:dev": "bun run build:css && ELECTROBUN_BUILD_ENV=dev electrobun build --env=dev",
     "build:css": "tailwindcss -i src/mainview/src/index.css -o src/mainview/electrobun.css --minify",
     "build:web": "vite build",
     "test": "bun test",

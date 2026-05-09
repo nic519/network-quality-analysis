@@ -4,6 +4,6 @@ node_modules/
 build/
 dist-web/
 *.log
-src/mainview/electrobun.css
-
+artifacts/
 .codex/skills/ui-ux-pro-max/*
+src/mainview/electrobun.css
