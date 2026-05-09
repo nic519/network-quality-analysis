@@ -113,7 +113,7 @@ export function AnalysisView({
           </ScrollArea>
         </aside>
 
-        <div className="flex min-h-0 min-w-0 flex-col">
+        <div className="custom-scrollbar min-h-0 min-w-0 overflow-y-auto">
           <div className="shrink-0 border-b border-border px-5 py-2">
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               <label className="flex items-center gap-2">
@@ -144,7 +144,17 @@ export function AnalysisView({
                 />
               </label>
 
-              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+              <Button className="ml-auto shrink-0" variant="outline" onClick={onCopyResults} disabled={!state.results.length}>
+                <Copy className="h-4 w-4" />
+                复制结果
+              </Button>
+            </div>
+            {error ? <div className="mt-2 text-sm text-red-300">{error}</div> : null}
+          </div>
+
+          <div className="min-w-0 px-5 py-5">
+            <section className="min-w-0">
+              <div className="mb-3 flex flex-wrap items-center gap-1.5">
                 {selectableSites.map((site) => {
                   const active = site.id === selectedSite?.id;
                   return (
@@ -165,20 +175,11 @@ export function AnalysisView({
                   );
                 })}
               </div>
-              <Button className="ml-auto shrink-0" variant="outline" onClick={onCopyResults} disabled={!state.results.length}>
-                <Copy className="h-4 w-4" />
-                复制结果
-              </Button>
-            </div>
-            {error ? <div className="mt-2 text-sm text-red-300">{error}</div> : null}
-          </div>
 
-          <div className="custom-scrollbar min-h-0 min-w-0 flex-1 overflow-y-auto px-5 py-5">
-              <section className="min-w-0">
-                <div className="h-[420px] rounded-md border border-border bg-card/45 px-3 py-3">
-                  {availableChartRows.length ? (
-                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} initialDimension={{ width: 800, height: 420 }}>
-                      <BarChart accessibilityLayer data={availableChartRows.slice(0, 12)} layout="vertical" margin={{ left: 0, right: 44, top: 8, bottom: 8 }}>
+              <div className="h-[420px] rounded-md border border-border bg-card/45 px-3 py-3">
+                {availableChartRows.length ? (
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} initialDimension={{ width: 800, height: 420 }}>
+                    <BarChart accessibilityLayer data={availableChartRows.slice(0, 12)} layout="vertical" margin={{ left: 0, right: 44, top: 8, bottom: 8 }}>
                         <CartesianGrid horizontal={false} stroke="rgba(120, 120, 128, 0.18)" />
                         <XAxis
                           type="number"
@@ -193,10 +194,9 @@ export function AnalysisView({
                           dataKey="proxyName"
                           tickLine={false}
                           axisLine={false}
-                          tickMargin={10}
-                          width={112}
-                          tick={{ fill: "rgb(229 229 234)", fontSize: 12 }}
-                          tickFormatter={truncateChartLabel}
+                          tickMargin={12}
+                          width={232}
+                          tick={<ChartYAxisTick />}
                         />
                         <Tooltip
                           cursor={{ fill: "rgba(120, 120, 128, 0.10)" }}
@@ -225,17 +225,17 @@ export function AnalysisView({
                       当前筛选下没有 {selectedSite?.name ?? "该网站"} 的可绘图延迟数据。
                     </div>
                   )}
-                </div>
+              </div>
 
-                <section className="mt-6">
-                  <div className="text-xs font-medium text-muted-foreground">失败记录</div>
-                  {failedSiteRows.length ? (
-                    <FailureTable rows={failedSiteRows} />
-                  ) : (
-                    <div className="mt-3 text-sm leading-6 text-muted-foreground">当前批次或时间范围内没有失败记录。</div>
-                  )}
-                </section>
+              <section className="mt-6">
+                <div className="text-xs font-medium text-muted-foreground">失败记录</div>
+                {failedSiteRows.length ? (
+                  <FailureTable rows={failedSiteRows} />
+                ) : (
+                  <div className="mt-3 text-sm leading-6 text-muted-foreground">当前批次或时间范围内没有失败记录。</div>
+                )}
               </section>
+            </section>
           </div>
         </div>
       </div>
@@ -245,42 +245,40 @@ export function AnalysisView({
 
 function FailureTable({ rows }: { rows: ReturnType<typeof buildFailedSiteRows> }) {
   return (
-    <ScrollArea className="mt-3 rounded-md border border-border bg-card/45" viewportClassName="max-h-[260px]">
-      <div className="w-full">
-        <Table>
-          <TableHeader className="sticky top-0 z-10 bg-card/95 backdrop-blur [&_tr]:border-border">
-            <TableRow className="hover:bg-transparent">
-              <TableHead className="h-9 px-3 text-xs text-muted-foreground">节点</TableHead>
-              <TableHead className="h-9 px-3 text-xs text-muted-foreground">失败网站</TableHead>
+    <div className="mt-3 rounded-md border border-border bg-card/45">
+      <Table>
+        <TableHeader className="[&_tr]:border-border">
+          <TableRow className="hover:bg-transparent">
+            <TableHead className="h-9 px-3 text-xs text-muted-foreground">节点</TableHead>
+            <TableHead className="h-9 px-3 text-xs text-muted-foreground">失败网站</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody className="[&_tr:last-child]:border-0">
+          {rows.map((row) => (
+            <TableRow key={row.key} className="border-border hover:bg-accent/35">
+              <TableCell className="px-3 py-2.5">
+                <div className="truncate text-sm text-foreground">
+                  <span className="font-medium">{row.proxyName}</span>
+                  <span className="mx-2 text-muted-foreground">·</span>
+                  <span className="text-xs text-muted-foreground">
+                    {row.proxyType} / {row.regionLabel}
+                  </span>
+                </div>
+              </TableCell>
+              <TableCell className="px-3 py-2.5">
+                <div className="flex flex-wrap gap-1.5">
+                  {row.failedSites.map((siteName) => (
+                    <Badge key={`${row.key}-${siteName}`} variant="outline" className="border-border bg-secondary text-secondary-foreground">
+                      {siteName}
+                    </Badge>
+                  ))}
+                </div>
+              </TableCell>
             </TableRow>
-          </TableHeader>
-          <TableBody className="[&_tr:last-child]:border-border">
-            {rows.map((row) => (
-              <TableRow key={row.key} className="border-border hover:bg-accent/35">
-                <TableCell className="px-3 py-2.5">
-                  <div className="truncate text-sm text-foreground">
-                    <span className="font-medium">{row.proxyName}</span>
-                    <span className="mx-2 text-muted-foreground">·</span>
-                    <span className="text-xs text-muted-foreground">
-                      {row.proxyType} / {row.regionLabel}
-                    </span>
-                  </div>
-                </TableCell>
-                <TableCell className="px-3 py-2.5">
-                  <div className="flex flex-wrap gap-1.5">
-                    {row.failedSites.map((siteName) => (
-                      <Badge key={`${row.key}-${siteName}`} variant="outline" className="border-border bg-secondary text-secondary-foreground">
-                        {siteName}
-                      </Badge>
-                    ))}
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-    </ScrollArea>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   );
 }
 
@@ -406,6 +404,26 @@ function shortenId(id: string) {
   return id.length > 18 ? id.slice(-18) : id;
 }
 
-function truncateChartLabel(value: string) {
-  return value.length > 13 ? `${value.slice(0, 13)}…` : value;
+function ChartYAxisTick({
+  x = 0,
+  y = 0,
+  payload,
+}: {
+  x?: number;
+  y?: number;
+  payload?: { value?: string };
+}) {
+  const label = payload?.value ?? "";
+  const width = 220;
+
+  return (
+    <g>
+      <title>{label}</title>
+      <foreignObject x={x - width - 12} y={y - 12} width={width} height={24}>
+        <div className="overflow-hidden text-ellipsis whitespace-nowrap pr-1 text-left text-xs font-medium leading-6 text-foreground">
+          {label}
+        </div>
+      </foreignObject>
+    </g>
+  );
 }

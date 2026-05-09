@@ -75,7 +75,7 @@ export function RunSetupView({
                 <div className="grid gap-1.5">
                   <span className="text-xs font-medium text-muted-foreground">读取预设</span>
                   {recentConfigPaths.length ? (
-                    <div className="custom-scrollbar flex min-w-0 flex-nowrap gap-2 overflow-x-auto pb-1">
+                    <div className="custom-scrollbar flex min-w-0 flex-nowrap gap-2 overflow-x-auto overflow-y-hidden pb-1">
                       {recentConfigPaths.map((item) => (
                         <Button
                           key={item.path}
