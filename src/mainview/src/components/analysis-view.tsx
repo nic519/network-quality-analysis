@@ -52,9 +52,9 @@ export function AnalysisView({
   const failedSiteRows = buildFailedSiteRows(scopedResults, search);
 
   return (
-    <section className="h-full min-h-[720px]">
-      <div className="grid h-full min-h-[720px] lg:grid-cols-[300px_minmax(0,1fr)]">
-        <aside className="border-r border-border bg-secondary/25">
+    <section className="h-full min-h-0">
+      <div className="grid h-full min-h-0 lg:grid-cols-[300px_minmax(0,1fr)]">
+        <aside className="flex min-h-0 flex-col border-r border-border bg-secondary/25">
           <div className="flex h-14 items-center justify-between border-b border-border px-4">
             <div>
               <h1 className="text-base font-semibold text-foreground">运行批次</h1>
@@ -82,7 +82,7 @@ export function AnalysisView({
             </button>
           </div>
 
-          <ScrollArea className="p-2" viewportClassName="max-h-[calc(100vh-130px)]" contentClassName="space-y-1">
+          <ScrollArea className="min-h-0 flex-1 p-2" viewportClassName="h-full" contentClassName="space-y-1">
             <div role="radiogroup" aria-label="运行批次" className="space-y-1">
               {runItems.map((run) => {
                 const isActive = selectedRunId === run.id;
@@ -115,8 +115,8 @@ export function AnalysisView({
           </ScrollArea>
         </aside>
 
-        <div className="flex min-w-0 flex-col">
-          <div className="border-b border-border px-5 py-3">
+        <div className="flex min-h-0 min-w-0 flex-col">
+          <div className="shrink-0 border-b border-border px-5 py-3">
             <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
               <div className="flex min-w-0 flex-1 flex-wrap items-end gap-3">
                   <label className="space-y-1">
@@ -184,12 +184,12 @@ export function AnalysisView({
               {error ? <div className="mt-3 text-sm text-red-300">{error}</div> : null}
           </div>
 
-          <div className="min-w-0 flex-1 px-5 py-5">
+          <div className="custom-scrollbar min-h-0 min-w-0 flex-1 overflow-y-auto px-5 py-5">
               <section className="min-w-0">
                 <div className="h-[420px] rounded-md border border-border bg-card/45 px-3 py-3">
                   {availableChartRows.length ? (
                     <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} initialDimension={{ width: 800, height: 420 }}>
-                      <BarChart accessibilityLayer data={availableChartRows.slice(0, 12)} layout="vertical" margin={{ left: 8, right: 36, top: 8, bottom: 8 }}>
+                      <BarChart accessibilityLayer data={availableChartRows.slice(0, 12)} layout="vertical" margin={{ left: 0, right: 44, top: 8, bottom: 8 }}>
                         <CartesianGrid horizontal={false} stroke="rgba(120, 120, 128, 0.18)" />
                         <XAxis
                           type="number"
@@ -205,7 +205,7 @@ export function AnalysisView({
                           tickLine={false}
                           axisLine={false}
                           tickMargin={10}
-                          width={168}
+                          width={112}
                           tick={{ fill: "rgb(229 229 234)", fontSize: 12 }}
                           tickFormatter={truncateChartLabel}
                         />
@@ -418,5 +418,5 @@ function shortenId(id: string) {
 }
 
 function truncateChartLabel(value: string) {
-  return value.length > 18 ? `${value.slice(0, 18)}…` : value;
+  return value.length > 13 ? `${value.slice(0, 13)}…` : value;
 }

@@ -41,7 +41,8 @@ export function RunSetupView({
   const isRunDisabled = !configPath.trim() || !selectedRegionIds.length || !enabledSites.length || isPending;
 
   return (
-    <section className="mx-auto max-w-6xl px-6 pb-8">
+    <section className="custom-scrollbar h-full overflow-y-auto px-6 pb-8">
+      <div className="mx-auto max-w-6xl">
       <header className="flex h-14 items-center justify-between border-b border-border">
         <div>
           <h1 className="text-base font-semibold text-foreground">执行测试</h1>
@@ -177,6 +178,7 @@ export function RunSetupView({
               <TerminalLog messages={progressLog} />
             </div>
         </section>
+      </div>
       </div>
     </section>
   );

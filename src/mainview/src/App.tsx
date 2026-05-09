@@ -213,7 +213,7 @@ export default function App() {
         <TopNavigation activeView={activeView} onChange={setActiveView} state={state.clashSpeedtest} />
       </aside>
 
-      <div className="custom-scrollbar min-w-0 flex-1 overflow-y-auto">
+      <div className="min-w-0 flex-1 overflow-hidden">
         {activeView === "run" ? (
           <RunSetupView
             state={state}

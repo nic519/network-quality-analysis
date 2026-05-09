@@ -36,7 +36,8 @@ export function DiagnosticsView({
   }, [sites]);
 
   return (
-    <section className="mx-auto flex max-w-5xl flex-col px-6 pb-8">
+    <section className="custom-scrollbar h-full overflow-y-auto px-6 pb-8">
+      <div className="mx-auto flex max-w-5xl flex-col">
       <header className="flex h-14 items-center justify-between border-b border-border">
         <div>
           <h1 className="text-base font-semibold text-foreground">设置</h1>
@@ -167,6 +168,7 @@ export function DiagnosticsView({
         </div>
       </details>
         </section>
+      </div>
       </div>
     </section>
   );
