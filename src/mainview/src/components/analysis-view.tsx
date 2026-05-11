@@ -1,4 +1,4 @@
-import { Circle, CircleDot, Copy, Search } from "lucide-react";
+import { AlertCircle, Circle, CircleDot, Copy, Gauge, Search, ShieldCheck, Trophy } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
@@ -47,7 +47,9 @@ export function AnalysisView({
   const scopedResults = filterScopedResults(state.results, selectedRunId);
   const chartRows = buildRunScopedChartRows(scopedResults, search, selectedSite?.name);
   const availableChartRows = chartRows.filter((row) => row.isAvailable);
+  const recommendedRows = availableChartRows.slice(0, 3);
   const failedSiteRows = buildFailedSiteRows(scopedResults, search);
+  const fastestRow = recommendedRows[0];
 
   return (
     <section className="h-full min-h-0">
@@ -55,8 +57,8 @@ export function AnalysisView({
         <aside className="flex min-h-0 flex-col border-r border-border bg-secondary/25">
           <div className="flex h-14 items-center justify-between border-b border-border px-4">
             <div>
-              <h1 className="text-base font-semibold text-foreground">运行批次</h1>
-              <p className="text-xs text-muted-foreground">选择历史记录或查看汇总。</p>
+              <h1 className="text-base font-semibold text-foreground">历史测试</h1>
+              <p className="text-xs text-muted-foreground">选择一次测速，或查看所有历史。</p>
             </div>
             <Badge variant="outline" className="border-border bg-secondary text-muted-foreground">
               {state.runs.length} 条
@@ -74,14 +76,14 @@ export function AnalysisView({
               )}
               onClick={() => onSelectedRunIdChange("all")}
             >
-              {selectedRunId === "all" ? <CircleDot className="h-4 w-4 text-emerald-300" /> : <Circle className="h-4 w-4 text-muted-foreground" />}
+              {selectedRunId === "all" ? <CircleDot className="h-4 w-4 text-primary" /> : <Circle className="h-4 w-4 text-muted-foreground" />}
               <span className="min-w-0 flex-1 font-medium">全部运行</span>
               <span className="text-xs text-muted-foreground">{state.results.length}</span>
             </button>
           </div>
 
           <ScrollArea className="min-h-0 flex-1 p-2" viewportClassName="h-full" contentClassName="space-y-1">
-            <div role="radiogroup" aria-label="运行批次" className="space-y-1">
+            <div role="radiogroup" aria-label="历史测试" className="space-y-1">
               {runItems.map((run) => {
                 const isActive = selectedRunId === run.id;
                 return (
@@ -117,7 +119,7 @@ export function AnalysisView({
           <div className="shrink-0 border-b border-border px-5 py-2">
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               <label className="flex items-center gap-2">
-                <span className="text-[11px] font-medium text-muted-foreground">From</span>
+                <span className="text-[11px] font-medium text-muted-foreground">开始日期</span>
                 <Input
                   type="date"
                   value={fromDate}
@@ -126,7 +128,7 @@ export function AnalysisView({
                 />
               </label>
               <label className="flex items-center gap-2">
-                <span className="text-[11px] font-medium text-muted-foreground">To</span>
+                <span className="text-[11px] font-medium text-muted-foreground">结束日期</span>
                 <Input
                   type="date"
                   value={toDate}
@@ -145,11 +147,63 @@ export function AnalysisView({
               </label>
 
             </div>
-            {error ? <div className="mt-2 text-sm text-red-300">{error}</div> : null}
+            {error ? <div className="mt-2 text-sm text-destructive">{error}</div> : null}
           </div>
 
           <div className="min-w-0 px-5 py-5">
             <section className="min-w-0">
+              <div className="mb-5">
+                <div className="mb-3 flex items-center gap-2">
+                  <Trophy className="h-4 w-4 text-primary" />
+                  <h2 className="text-sm font-semibold text-foreground">结果摘要</h2>
+                  <span className="text-xs text-muted-foreground">先看结论，再看图表明细</span>
+                </div>
+                <div className="mb-3 grid gap-2 lg:grid-cols-3">
+                  <SummaryTile
+                    icon={Gauge}
+                    label="最快节点"
+                    value={fastestRow ? fastestRow.proxyName : "暂无"}
+                    detail={fastestRow ? `${fastestRow.latencyLabel} / ${selectedSite?.name ?? "当前网站"}` : "完成测速后显示"}
+                  />
+                  <SummaryTile
+                    icon={ShieldCheck}
+                    label="可用节点"
+                    value={`${availableChartRows.length}/${chartRows.length}`}
+                    detail={selectedSite ? `${selectedSite.name} 下可绘图延迟` : "当前筛选范围"}
+                  />
+                  <SummaryTile
+                    icon={AlertCircle}
+                    label="失败节点"
+                    value={`${failedSiteRows.length}`}
+                    detail={failedSiteRows.length ? "下方失败记录可查看网站" : "当前范围没有失败记录"}
+                  />
+                </div>
+                {recommendedRows.length ? (
+                  <div className="grid gap-2 lg:grid-cols-3">
+                    {recommendedRows.map((row, index) => (
+                      <div key={`recommend-${row.key}`} className="rounded-md border border-border bg-card/45 px-3 py-3">
+                        <div className="mb-2 flex items-center justify-between gap-2">
+                          <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
+                            第 {index + 1} 名
+                          </Badge>
+                          <span className="text-sm font-semibold text-foreground">{row.latencyLabel}</span>
+                        </div>
+                        <div className="truncate text-sm font-medium text-foreground" title={row.proxyName}>
+                          {row.proxyName}
+                        </div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {row.proxyType} / {row.regionLabel} / {selectedSite?.name}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-md border border-dashed border-border bg-secondary/30 px-3 py-4 text-sm text-muted-foreground">
+                    还没有可推荐的节点。完成一次测速后，这里会直接显示最快的结果。
+                  </div>
+                )}
+              </div>
+
               <div className="mb-3 flex min-w-0 flex-wrap items-center gap-2">
                 <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
                   {selectableSites.map((site) => {
@@ -211,7 +265,7 @@ export function AnalysisView({
                                 <div className="mt-1 text-muted-foreground">
                                   {row.proxyType} / {row.regionLabel} / {selectedSite?.name}
                                 </div>
-                                <div className="mt-1 font-semibold text-emerald-200">{row.latencyLabel}</div>
+                                <div className="mt-1 font-semibold text-primary">{row.latencyLabel}</div>
                               </div>
                             );
                           }}
@@ -242,6 +296,33 @@ export function AnalysisView({
         </div>
       </div>
     </section>
+  );
+}
+
+function SummaryTile({
+  icon: Icon,
+  label,
+  value,
+  detail,
+}: {
+  icon: typeof Gauge;
+  label: string;
+  value: string;
+  detail: string;
+}) {
+  return (
+    <div className="rounded-md border border-border bg-card/45 px-3 py-3">
+      <div className="mb-2 flex items-center gap-2 text-xs font-medium text-muted-foreground">
+        <Icon className="h-4 w-4 text-primary" />
+        {label}
+      </div>
+      <div className="truncate text-sm font-semibold text-foreground" title={value}>
+        {value}
+      </div>
+      <div className="mt-1 truncate text-xs text-muted-foreground" title={detail}>
+        {detail}
+      </div>
+    </div>
   );
 }
 
