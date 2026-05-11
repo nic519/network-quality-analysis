@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
-import { Check, ChevronDown, Copy, Download, FolderOpen, Plus, RotateCcw, Save, Trash2, X } from "lucide-react";
+import { Check, ChevronDown, Copy, Download, FolderOpen, Monitor, Moon, Plus, RotateCcw, Save, Sun, Trash2, X } from "lucide-react";
 import { ClashSpeedtestInlineStatus, getDiagnosticsSummary } from "./clash-speedtest-status";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
+import { cn } from "../lib/utils";
 import { DEFAULT_SITES } from "../../../shared/domain";
 import type { SiteDefinition } from "../../../shared/domain";
 import type { AppState } from "../../../shared/rpc";
+import type { ThemeMode } from "../App";
 
 const GO_INSTALL_COMMAND = "go install github.com/nic519/clash-speedtest@latest";
 
@@ -19,6 +21,8 @@ export function DiagnosticsView({
   onExportAllResults,
   onCopyInstallCommand,
   canExportResults,
+  themeMode,
+  onThemeModeChange,
 }: {
   state: AppState["clashSpeedtest"];
   sites: SiteDefinition[];
@@ -29,6 +33,8 @@ export function DiagnosticsView({
   onExportAllResults: () => void;
   onCopyInstallCommand: () => Promise<void>;
   canExportResults: boolean;
+  themeMode: ThemeMode;
+  onThemeModeChange: (mode: ThemeMode) => void;
 }) {
   const [manualPath, setManualPath] = useState(state.source === "manual" ? state.path ?? "" : "");
   const [draftSites, setDraftSites] = useState<SiteDefinition[]>(sites);
@@ -54,17 +60,48 @@ export function DiagnosticsView({
       <div className="mx-auto flex max-w-5xl flex-col">
         <header className="flex h-14 items-center justify-between border-b border-border">
           <div>
-            <h1 className="text-base font-semibold text-foreground">设置</h1>
-            <p className="text-xs text-muted-foreground">管理测试网站和本机依赖。</p>
+            <h1 className="text-base font-semibold text-foreground">工具设置</h1>
+            <p className="text-xs text-muted-foreground">管理目标网站、测速工具和历史结果。</p>
           </div>
         </header>
 
         <div className="divide-y divide-border">
           <section className="py-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-sm font-semibold text-foreground">外观</h2>
+                <p className="mt-1 text-xs text-muted-foreground">选择浅色、深色，或跟随设备设置。</p>
+              </div>
+              <div className="inline-flex rounded-md border border-border bg-secondary/35 p-1" role="radiogroup" aria-label="外观模式">
+                {themeOptions.map((option) => {
+                  const Icon = option.icon;
+                  const active = option.id === themeMode;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={active}
+                      className={cn(
+                        "inline-flex h-8 items-center gap-2 rounded px-2.5 text-sm transition-colors",
+                        active ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+                      )}
+                      onClick={() => onThemeModeChange(option.id)}
+                    >
+                      <Icon className="h-4 w-4" />
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </section>
+
+          <section className="py-5">
             <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="text-sm font-semibold text-foreground">测试网站</h2>
-                <p className="mt-1 text-xs text-muted-foreground">勾选启用的网站会参与测试，未勾选的网站保留但跳过。</p>
+                <h2 className="text-sm font-semibold text-foreground">目标网站管理</h2>
+                <p className="mt-1 text-xs text-muted-foreground">这里维护可选网站；每次测速时可在开始页选择本次目标。</p>
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button type="button" variant="outline" size="sm" onClick={() => setDraftSites([...draftSites, createBlankSite()])}>
@@ -92,7 +129,7 @@ export function DiagnosticsView({
                       type="checkbox"
                       checked={site.enabled !== false}
                       onChange={(event) => updateDraftSite(index, { enabled: event.target.checked })}
-                      className="h-4 w-4 accent-emerald-400"
+                      className="h-4 w-4 accent-[hsl(var(--primary))]"
                       aria-label={`测试网站 ${index + 1} 是否启用`}
                     />
                     <span className="lg:hidden">启用</span>
@@ -113,7 +150,7 @@ export function DiagnosticsView({
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="justify-center text-red-200 hover:bg-red-500/10"
+                    className="justify-center text-destructive hover:bg-destructive/10"
                     onClick={() => setDraftSites(draftSites.filter((_, siteIndex) => siteIndex !== index))}
                     aria-label={`删除测试网站 ${index + 1}`}
                   >
@@ -124,7 +161,7 @@ export function DiagnosticsView({
               ))}
             </div>
             <div className="flex flex-col gap-2 px-3 py-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-              <span>保存后只测试已启用的网站；历史结果不受影响。</span>
+              <span>保存后会更新开始页可选网站；历史结果不受影响。</span>
               <Button type="button" size="sm" className="shrink-0" onClick={() => onSaveSites(draftSites)}>
                 <Save className="h-4 w-4" />
                 保存网站
@@ -134,7 +171,7 @@ export function DiagnosticsView({
 
           <section className="grid gap-3 py-5">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-sm font-semibold text-foreground">依赖</h2>
+              <h2 className="text-sm font-semibold text-foreground">测速工具状态</h2>
               <ClashSpeedtestInlineStatus state={state} />
             </div>
             <div className="flex items-center gap-2 rounded-md border border-border bg-secondary/35 px-3 py-2">
@@ -162,8 +199,8 @@ export function DiagnosticsView({
           <section className="py-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="text-sm font-semibold text-foreground">结果迁移</h2>
-                <p className="mt-1 text-xs text-muted-foreground">导出全部测试结果，用于迁移到另一台电脑后导入使用。</p>
+                <h2 className="text-sm font-semibold text-foreground">历史结果导出</h2>
+                <p className="mt-1 text-xs text-muted-foreground">导出全部测试结果，用于备份或迁移到另一台电脑。</p>
               </div>
               <Button type="button" variant="outline" className="shrink-0" onClick={onExportAllResults} disabled={!canExportResults}>
                 <Download className="h-4 w-4" />
@@ -176,7 +213,7 @@ export function DiagnosticsView({
             <details>
               <summary className="flex cursor-pointer list-none items-center justify-between rounded-md px-2 py-2 text-left hover:bg-accent/65">
                 <div>
-                  <div className="text-sm font-semibold text-foreground">开发调试</div>
+                  <div className="text-sm font-semibold text-foreground">高级调试</div>
                   <div className="mt-1 text-xs text-muted-foreground">{getDiagnosticsSummary(state)} 手动指定路径，或切回系统命令依赖。</div>
                 </div>
                 <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -223,6 +260,12 @@ export function DiagnosticsView({
     setDraftSites((current) => current.map((site, siteIndex) => (siteIndex === index ? { ...site, ...patch } : site)));
   }
 }
+
+const themeOptions: Array<{ id: ThemeMode; label: string; icon: typeof Monitor }> = [
+  { id: "system", label: "跟随系统", icon: Monitor },
+  { id: "light", label: "浅色", icon: Sun },
+  { id: "dark", label: "深色", icon: Moon },
+];
 
 function createBlankSite(): SiteDefinition {
   return {

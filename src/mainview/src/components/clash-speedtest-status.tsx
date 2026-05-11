@@ -69,15 +69,15 @@ function getQuickStatusBadgeText(state: ClashSpeedtestState) {
 }
 
 function getQuickStatusBadgeClass(state: ClashSpeedtestState) {
-  if (state.status === "error") return "border-red-500/40 bg-red-500/10 text-red-200";
+  if (state.status === "error") return "border-destructive/40 bg-destructive/10 text-destructive";
   if (state.status === "missing") return "border-border bg-muted text-muted-foreground";
-  return "border-emerald-500/35 bg-emerald-500/10 text-emerald-200";
+  return "border-primary/35 bg-primary/10 text-primary";
 }
 
 function getStatusTone(state: ClashSpeedtestState) {
-  if (state.status === "error") return "text-red-300";
+  if (state.status === "error") return "text-destructive";
   if (state.status === "missing") return "text-muted-foreground";
-  return "text-emerald-300";
+  return "text-primary";
 }
 
 function isBusy(state: ClashSpeedtestState) {

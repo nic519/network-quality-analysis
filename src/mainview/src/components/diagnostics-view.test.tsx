@@ -28,12 +28,14 @@ describe("DiagnosticsView", () => {
         onExportAllResults={() => {}}
         onCopyInstallCommand={async () => {}}
         canExportResults={false}
+        themeMode="system"
+        onThemeModeChange={() => {}}
       />,
     );
 
     expect(html).toContain('aria-label="复制安装命令"');
     expect(html).toContain("github.com/nic519/clash-speedtest@latest");
-    expect(html).toContain(">依赖</h2><div class=\"flex items-center gap-2 text-sm text-secondary-foreground\"");
+    expect(html).toContain(">测速工具状态</h2><div class=\"flex items-center gap-2 text-sm text-secondary-foreground\"");
     expect(html).toContain("当前使用系统命令依赖。 手动指定路径，或切回系统命令依赖。");
   });
 });

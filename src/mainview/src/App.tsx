@@ -12,6 +12,7 @@ import type { RegionPreset, SiteDefinition } from "../../shared/domain";
 import type { AppState } from "../../shared/rpc";
 
 const today = new Date().toISOString().slice(0, 10);
+export type ThemeMode = "system" | "light" | "dark";
 
 export default function App() {
   const [state, setState] = useState<AppState>({
@@ -32,6 +33,7 @@ export default function App() {
   const [activeView, setActiveView] = useState<AppView>("run");
   const [configPath, setConfigPath] = useState("");
   const [selectedRegionIds, setSelectedRegionIds] = useState<string[]>(["hong-kong"]);
+  const [selectedSiteIds, setSelectedSiteIds] = useState<string[]>(DEFAULT_SITES.map((site) => site.id));
   const [selectedRunId, setSelectedRunId] = useState<string>("all");
   const [fromDate, setFromDate] = useState(today);
   const [toDate, setToDate] = useState(today);
@@ -41,7 +43,9 @@ export default function App() {
   const [progressLog, setProgressLog] = useState<string[]>(["准备就绪"]);
   const [error, setError] = useState<string | null>(null);
   const [isRunPending, setIsRunPending] = useState(false);
+  const [themeMode, setThemeMode] = useState<ThemeMode>(() => readInitialThemeMode());
   const isRunInFlightRef = useRef(false);
+  const siteSettingsSignatureRef = useRef("");
   const [, startTransition] = useTransition();
 
   const filters = useMemo(
@@ -84,6 +88,32 @@ export default function App() {
     }
   }, [selectedSiteId, state.results, state.sites]);
 
+  useEffect(() => {
+    const nextSignature = state.sites.map((site) => `${site.id}:${site.enabled !== false}`).join("|");
+    const shouldUseSavedSiteSelection = siteSettingsSignatureRef.current !== nextSignature;
+    siteSettingsSignatureRef.current = nextSignature;
+
+    setSelectedSiteIds((current) => {
+      if (shouldUseSavedSiteSelection) {
+        return state.sites.filter((site) => site.enabled !== false).map((site) => site.id);
+      }
+
+      const validSiteIds = new Set(state.sites.map((site) => site.id));
+      const nextSelectedIds = current.filter((siteId) => validSiteIds.has(siteId));
+      if (nextSelectedIds.length) return nextSelectedIds;
+      return state.sites.filter((site) => site.enabled !== false).map((site) => site.id);
+    });
+  }, [state.sites]);
+
+  useEffect(() => {
+    if (themeMode === "system") {
+      document.documentElement.removeAttribute("data-theme");
+    } else {
+      document.documentElement.dataset.theme = themeMode;
+    }
+    window.localStorage.setItem("latency-compass-theme", themeMode);
+  }, [themeMode]);
+
   const recentConfigPaths = state.configHistory.filter((item) => item.path !== configPath);
   const diagnosticsHint = getDiagnosticsHint(state.clashSpeedtest);
 
@@ -96,6 +126,10 @@ export default function App() {
     setProgress("启动测试任务");
     setProgressLog(["启动测试任务"]);
     try {
+      const sitesForRun = state.sites.map((site) => ({ ...site, enabled: selectedSiteIds.includes(site.id) }));
+      if (sitesForRun.length) {
+        await api.setTestSites({ sites: sitesForRun });
+      }
       const nextState = await api.startRun({
         configPath: configPath.trim(),
         regionIds: selectedRegionIds as RegionPreset["id"][],
@@ -211,6 +245,7 @@ export default function App() {
       const savedSites = await api.setTestSites({ sites });
       const enabledSiteCount = savedSites.filter((site) => site.enabled !== false).length;
       setState((current) => ({ ...current, sites: savedSites }));
+      setSelectedSiteIds(savedSites.filter((site) => site.enabled !== false).map((site) => site.id));
       setProgress(`已保存 ${savedSites.length} 个测试网站，其中 ${enabledSiteCount} 个已启用`);
     } catch (caught) {
       setError(toErrorMessage(caught));
@@ -218,10 +253,10 @@ export default function App() {
   }
 
   return (
-    <main className="flex h-screen overflow-hidden bg-background text-foreground">
-      <aside className="sticky top-0 h-screen w-[196px] shrink-0 border-r border-border bg-secondary/65">
+    <main className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
+      <header className="shrink-0 border-b border-border bg-card">
         <TopNavigation activeView={activeView} onChange={setActiveView} state={state.clashSpeedtest} />
-      </aside>
+      </header>
 
       <div className="min-w-0 flex-1 overflow-hidden">
         {activeView === "run" ? (
@@ -233,6 +268,8 @@ export default function App() {
             recentConfigPaths={recentConfigPaths}
             selectedRegionIds={selectedRegionIds}
             onToggleRegion={toggleRegion}
+            selectedSiteIds={selectedSiteIds}
+            onToggleSite={toggleSite}
             progress={progress}
             progressLog={progressLog}
             error={error}
@@ -272,6 +309,8 @@ export default function App() {
             onExportAllResults={exportAllResults}
             onCopyInstallCommand={copyInstallCommand}
             canExportResults={Boolean(state.results.length)}
+            themeMode={themeMode}
+            onThemeModeChange={setThemeMode}
           />
         ) : null}
       </div>
@@ -281,6 +320,12 @@ export default function App() {
   function toggleRegion(regionId: string) {
     setSelectedRegionIds((current) =>
       current.includes(regionId) ? current.filter((id) => id !== regionId) : [...current, regionId],
+    );
+  }
+
+  function toggleSite(siteId: string) {
+    setSelectedSiteIds((current) =>
+      current.includes(siteId) ? current.filter((id) => id !== siteId) : [...current, siteId],
     );
   }
 }
@@ -341,4 +386,10 @@ function getDiagnosticsHint(state: AppState["clashSpeedtest"]) {
 
 function toErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
+}
+
+function readInitialThemeMode(): ThemeMode {
+  if (typeof window === "undefined") return "system";
+  const stored = window.localStorage.getItem("latency-compass-theme");
+  return stored === "light" || stored === "dark" || stored === "system" ? stored : "system";
 }
