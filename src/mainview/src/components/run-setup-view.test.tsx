@@ -39,6 +39,8 @@ describe("RunSetupView", () => {
         ]}
         selectedRegionIds={["hong-kong"]}
         onToggleRegion={() => {}}
+        selectedSiteIds={["youtube", "github"]}
+        onToggleSite={() => {}}
         progress="准备开始"
         progressLog={[]}
         error={null}

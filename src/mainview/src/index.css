@@ -3,6 +3,73 @@
 @tailwind utilities;
 
 :root {
+  color-scheme: light;
+  --background: 0 0% 100%;
+  --foreground: 220 18% 15%;
+  --card: 0 0% 100%;
+  --card-foreground: 220 18% 15%;
+  --primary: 158 62% 32%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 220 14% 96%;
+  --secondary-foreground: 220 14% 22%;
+  --muted: 220 13% 94%;
+  --muted-foreground: 220 8% 43%;
+  --accent: 220 14% 92%;
+  --accent-foreground: 220 18% 14%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 220 13% 84%;
+  --input: 220 12% 74%;
+  --ring: 158 62% 32%;
+  --radius: 0.55rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --background: 240 5% 11%;
+    --foreground: 240 8% 92%;
+    --card: 240 5% 14%;
+    --card-foreground: 240 8% 92%;
+    --primary: 158 58% 48%;
+    --primary-foreground: 160 30% 8%;
+    --secondary: 240 4% 16%;
+    --secondary-foreground: 240 8% 88%;
+    --muted: 240 4% 18%;
+    --muted-foreground: 240 5% 62%;
+    --accent: 240 5% 23%;
+    --accent-foreground: 240 8% 94%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 240 8% 94%;
+    --border: 240 4% 23%;
+    --input: 240 4% 27%;
+    --ring: 158 58% 48%;
+  }
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --background: 0 0% 100%;
+  --foreground: 220 18% 15%;
+  --card: 0 0% 100%;
+  --card-foreground: 220 18% 15%;
+  --primary: 158 62% 32%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 220 14% 96%;
+  --secondary-foreground: 220 14% 22%;
+  --muted: 220 13% 94%;
+  --muted-foreground: 220 8% 43%;
+  --accent: 220 14% 92%;
+  --accent-foreground: 220 18% 14%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 220 13% 84%;
+  --input: 220 12% 74%;
+  --ring: 158 62% 32%;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
   --background: 240 5% 11%;
   --foreground: 240 8% 92%;
   --card: 240 5% 14%;
@@ -20,7 +87,6 @@
   --border: 240 4% 23%;
   --input: 240 4% 27%;
   --ring: 158 58% 48%;
-  --radius: 0.55rem;
 }
 
 * {
@@ -41,7 +107,7 @@ input {
 
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: rgba(110, 231, 183, 0.38) rgba(28, 25, 23, 0.72);
+  scrollbar-color: rgba(4, 120, 87, 0.38) rgba(226, 232, 240, 0.72);
 }
 
 .custom-scrollbar::-webkit-scrollbar {
@@ -50,17 +116,70 @@ input {
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: rgba(44, 44, 46, 0.72);
+  background: rgba(226, 232, 240, 0.72);
   border-radius: 9999px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(120, 120, 128, 0.42);
-  border: 2px solid rgba(44, 44, 46, 0.82);
+  background: rgba(100, 116, 139, 0.38);
+  border: 2px solid rgba(226, 232, 240, 0.82);
   border-radius: 9999px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(71, 85, 105, 0.48);
+}
+
+@media (prefers-color-scheme: dark) {
+  .custom-scrollbar {
+    scrollbar-color: rgba(110, 231, 183, 0.38) rgba(28, 25, 23, 0.72);
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: rgba(44, 44, 46, 0.72);
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(120, 120, 128, 0.42);
+    border-color: rgba(44, 44, 46, 0.82);
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(174, 174, 178, 0.54);
+  }
+}
+
+:root[data-theme="light"] .custom-scrollbar {
+  scrollbar-color: rgba(4, 120, 87, 0.38) rgba(226, 232, 240, 0.72);
+}
+
+:root[data-theme="light"] .custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(226, 232, 240, 0.72);
+}
+
+:root[data-theme="light"] .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.38);
+  border-color: rgba(226, 232, 240, 0.82);
+}
+
+:root[data-theme="light"] .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(71, 85, 105, 0.48);
+}
+
+:root[data-theme="dark"] .custom-scrollbar {
+  scrollbar-color: rgba(110, 231, 183, 0.38) rgba(28, 25, 23, 0.72);
+}
+
+:root[data-theme="dark"] .custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(44, 44, 46, 0.72);
+}
+
+:root[data-theme="dark"] .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(120, 120, 128, 0.42);
+  border-color: rgba(44, 44, 46, 0.82);
+}
+
+:root[data-theme="dark"] .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: rgba(174, 174, 178, 0.54);
 }
 
