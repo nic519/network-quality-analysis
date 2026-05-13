@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { ApplicationMenu, BrowserView, BrowserWindow, Utils } from "electrobun/bun";
 import { writeCsvExport } from "./csv";
+import { inspectConfigRegions } from "./config-inspection";
 import { LatencyDatabase } from "./db";
 import { chooseClashSpeedtestBinary, chooseConfigFile, chooseExportDirectory } from "./file-dialog";
 import { buildApplicationMenu } from "./menu";
@@ -35,6 +36,7 @@ const rpc = BrowserView.defineRPC<AppRPC>({
     requests: {
       getAppState: (filters) => getAppState(filters),
       selectConfigFile: ({ currentPath }) => chooseConfigFile({ currentPath, openFileDialog: Utils.openFileDialog }),
+      inspectConfig: ({ configPath }) => inspectConfigRegions(configPath),
       selectClashSpeedtestBinary: async ({ currentPath }) => {
         const selectedPath = await chooseClashSpeedtestBinary({
           currentPath: currentPath ?? manualClashSpeedtestPath,

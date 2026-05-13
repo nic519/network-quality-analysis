@@ -5,7 +5,9 @@ import { APP_RPC_TIMEOUT_MS, type AppRPC } from "../../../shared/rpc";
 import type {
   AppState,
   ClashSpeedtestState,
+  ConfigInspectionResult,
   ExportCsvResponse,
+  InspectConfigParams,
   ResetClashSpeedtestBinaryPathResponse,
   RunProgressState,
   SetProbeSettingsParams,
@@ -121,6 +123,17 @@ function createPreviewApi() {
 
   return {
     getAppState: async (filters: HistoryFilters) => getFilteredState(filters),
+    inspectConfig: async ({ configPath }: InspectConfigParams): Promise<ConfigInspectionResult> => ({
+      configPath,
+      totalNodeCount: 18,
+      regionCounts: [
+        { regionId: "hong-kong", regionLabel: "香港", matchedNodeCount: 6 },
+        { regionId: "singapore", regionLabel: "新加坡", matchedNodeCount: 4 },
+        { regionId: "japan", regionLabel: "日本", matchedNodeCount: 3 },
+        { regionId: "united-states", regionLabel: "美国", matchedNodeCount: 3 },
+        { regionId: "taiwan", regionLabel: "台湾", matchedNodeCount: 2 },
+      ],
+    }),
     startRun: async (_params: StartRunParams) => {
       progressHandler?.("浏览器预览模式：真实测试会在 Electrobun 桌面应用内运行");
       runProgressHandler?.({

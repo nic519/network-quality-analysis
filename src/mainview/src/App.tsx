@@ -10,7 +10,7 @@ import { buildAnalysisHistoryFilters } from "./lib/history-filters";
 import { DEFAULT_SITES, REGION_PRESETS, latencyToMs } from "../../shared/domain";
 import type { RegionPreset, SiteDefinition } from "../../shared/domain";
 import { DEFAULT_PROBE_SETTINGS, type ProbeSettings } from "../../shared/probe-settings";
-import type { AppState, RunProgressState } from "../../shared/rpc";
+import type { AppState, ConfigInspectionResult, RunProgressState } from "../../shared/rpc";
 
 const today = new Date().toISOString().slice(0, 10);
 export type ThemeMode = "system" | "light" | "dark";
@@ -44,6 +44,8 @@ export default function App() {
   const [progress, setProgress] = useState("准备就绪");
   const [progressLog, setProgressLog] = useState<string[]>(["准备就绪"]);
   const [runProgress, setRunProgress] = useState<RunProgressState | null>(null);
+  const [configInspection, setConfigInspection] = useState<ConfigInspectionResult | null>(null);
+  const [isInspectingConfig, setIsInspectingConfig] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isRunPending, setIsRunPending] = useState(false);
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => readInitialThemeMode());
@@ -128,6 +130,42 @@ export default function App() {
 
   const recentConfigPaths = state.configHistory.filter((item) => item.path !== configPath);
   const diagnosticsHint = getDiagnosticsHint(state.clashSpeedtest);
+
+  useEffect(() => {
+    const normalizedConfigPath = configPath.trim();
+    if (!looksInspectableConfigPath(normalizedConfigPath)) {
+      setConfigInspection(null);
+      setIsInspectingConfig(false);
+      return;
+    }
+
+    let isCancelled = false;
+    setIsInspectingConfig(true);
+    setConfigInspection(null);
+
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        const inspection = await api.inspectConfig({ configPath: normalizedConfigPath });
+        if (!isCancelled) {
+          setConfigInspection(inspection);
+        }
+      } catch (caught) {
+        if (!isCancelled) {
+          setConfigInspection(null);
+          setProgress(`配置解析失败：${toErrorMessage(caught)}`);
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsInspectingConfig(false);
+        }
+      }
+    }, 250);
+
+    return () => {
+      isCancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [configPath]);
 
   async function startRun() {
     if (isRunInFlightRef.current) return;
@@ -310,6 +348,8 @@ export default function App() {
             recentConfigPaths={recentConfigPaths}
             selectedRegionIds={selectedRegionIds}
             onToggleRegion={toggleRegion}
+            configInspection={configInspection}
+            isInspectingConfig={isInspectingConfig}
             selectedSiteIds={selectedSiteIds}
             onToggleSite={toggleSite}
             progress={progress}
@@ -437,4 +477,10 @@ function readInitialThemeMode(): ThemeMode {
   if (typeof window === "undefined") return "system";
   const stored = window.localStorage.getItem("latency-compass-theme");
   return stored === "light" || stored === "dark" || stored === "system" ? stored : "system";
+}
+
+function looksInspectableConfigPath(configPath: string) {
+  if (!configPath) return false;
+  if (/^https?:\/\//i.test(configPath)) return true;
+  return /\.(yaml|yml|json)(\?.*)?$/i.test(configPath);
 }

@@ -56,6 +56,18 @@ export type RunProgressState = {
   message: string;
 };
 
+export type RegionNodeCountSummary = {
+  regionId: RegionPreset["id"];
+  regionLabel: string;
+  matchedNodeCount: number;
+};
+
+export type ConfigInspectionResult = {
+  configPath: string;
+  totalNodeCount: number;
+  regionCounts: RegionNodeCountSummary[];
+};
+
 // 发起一次测速任务时需要的参数。
 export type StartRunParams = {
   // 选中的 Clash 配置文件路径。
@@ -80,6 +92,10 @@ export type OpenExternalUrlParams = {
 export type SelectConfigFileParams = {
   // 当前配置路径，用于让文件选择器定位到更合适的初始目录。
   currentPath?: string;
+};
+
+export type InspectConfigParams = {
+  configPath: string;
 };
 
 // 选择 clash-speedtest 可执行文件时的可选上下文参数。
@@ -129,6 +145,8 @@ export type AppRPC = {
       getAppState: { params: HistoryFilters; response: AppState };
       // 打开系统文件选择器，让用户选择 Clash 配置文件。
       selectConfigFile: { params: SelectConfigFileParams; response: string | null };
+      // 解析配置文件或订阅内容，统计各地区可匹配节点数。
+      inspectConfig: { params: InspectConfigParams; response: ConfigInspectionResult };
       // 打开系统文件选择器，让用户选择 clash-speedtest 可执行文件。
       selectClashSpeedtestBinary: { params: SelectClashSpeedtestBinaryParams; response: string | null };
       // 保存用户手动指定的 clash-speedtest 路径，并返回最终生效路径。

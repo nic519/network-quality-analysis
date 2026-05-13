@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { RunSetupView } from "./run-setup-view";
-import type { AppState, RunProgressState } from "../../../shared/rpc";
+import type { AppState, ConfigInspectionResult, RunProgressState } from "../../../shared/rpc";
 import { DEFAULT_PROBE_SETTINGS } from "../../../shared/probe-settings";
 
 const state: AppState = {
@@ -28,6 +28,15 @@ const state: AppState = {
 };
 
 describe("RunSetupView", () => {
+  const configInspection: ConfigInspectionResult = {
+    configPath: "https://example.com/config.yaml",
+    totalNodeCount: 10,
+    regionCounts: [
+      { regionId: "hong-kong", regionLabel: "香港", matchedNodeCount: 6 },
+      { regionId: "singapore", regionLabel: "新加坡", matchedNodeCount: 4 },
+    ],
+  };
+
   const activeRunProgress: RunProgressState = {
     stage: "running",
     completedGroups: 1,
@@ -58,6 +67,8 @@ describe("RunSetupView", () => {
         ]}
         selectedRegionIds={["hong-kong"]}
         onToggleRegion={() => {}}
+        configInspection={null}
+        isInspectingConfig={false}
         selectedSiteIds={["youtube", "github"]}
         onToggleSite={() => {}}
         progress="准备开始"
@@ -84,6 +95,8 @@ describe("RunSetupView", () => {
         recentConfigPaths={[]}
         selectedRegionIds={["hong-kong", "singapore"]}
         onToggleRegion={() => {}}
+        configInspection={null}
+        isInspectingConfig={false}
         selectedSiteIds={["youtube", "github"]}
         onToggleSite={() => {}}
         progress={activeRunProgress.message}
@@ -104,5 +117,34 @@ describe("RunSetupView", () => {
     expect(html).toContain("香港 -&gt; GitHub");
     expect(html).toContain("当前组合已返回 18 个节点结果");
     expect(html).toContain('aria-valuenow="25"');
+  });
+
+  test("renders matched node counts beside each region after config inspection", () => {
+    const html = renderToStaticMarkup(
+      <RunSetupView
+        state={state}
+        configPath="https://example.com/config.yaml"
+        onConfigPathChange={() => {}}
+        onSelectConfigFile={() => {}}
+        recentConfigPaths={[]}
+        selectedRegionIds={["hong-kong"]}
+        onToggleRegion={() => {}}
+        configInspection={configInspection}
+        isInspectingConfig={false}
+        selectedSiteIds={["youtube", "github"]}
+        onToggleSite={() => {}}
+        progress="已解析配置"
+        runProgress={null}
+        progressLog={[]}
+        error={null}
+        onStartRun={() => {}}
+        isPending={false}
+        diagnosticsHint={null}
+        onOpenDiagnostics={() => {}}
+      />,
+    );
+
+    expect(html).toContain(">香港</span><span class=\"shrink-0 text-xs text-muted-foreground\">6</span>");
+    expect(html).toContain(">新加坡</span><span class=\"shrink-0 text-xs text-muted-foreground\">4</span>");
   });
 });

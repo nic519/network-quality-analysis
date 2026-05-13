@@ -5,7 +5,7 @@ import { Input } from "./ui/input";
 import { ScrollArea } from "./ui/scroll-area";
 import { getDiagnosticsSummary } from "./clash-speedtest-status";
 import { cn } from "../lib/utils";
-import type { AppState, RunProgressState } from "../../../shared/rpc";
+import type { AppState, ConfigInspectionResult, RunProgressState } from "../../../shared/rpc";
 
 export function RunSetupView({
   state,
@@ -15,6 +15,8 @@ export function RunSetupView({
   recentConfigPaths,
   selectedRegionIds,
   onToggleRegion,
+  configInspection,
+  isInspectingConfig,
   selectedSiteIds,
   onToggleSite,
   progress,
@@ -33,6 +35,8 @@ export function RunSetupView({
   recentConfigPaths: AppState["configHistory"];
   selectedRegionIds: string[];
   onToggleRegion: (regionId: string) => void;
+  configInspection: ConfigInspectionResult | null;
+  isInspectingConfig: boolean;
   selectedSiteIds: string[];
   onToggleSite: (siteId: string) => void;
   progress: string;
@@ -115,6 +119,7 @@ export function RunSetupView({
                     key={region.id}
                     selected={selectedRegionIds.includes(region.id)}
                     label={region.label}
+                    meta={buildRegionCountLabel(region.id, configInspection, isInspectingConfig)}
                     onClick={() => onToggleRegion(region.id)}
                   />
                 ))}
@@ -322,10 +327,12 @@ function StepHeading({ number, title, description }: { number: string; title: st
 function SelectableButton({
   selected,
   label,
+  meta,
   onClick,
 }: {
   selected: boolean;
   label: string;
+  meta?: string | null;
   onClick: () => void;
 }) {
   return (
@@ -350,9 +357,19 @@ function SelectableButton({
       >
         {selected ? <Check className="h-3 w-3" /> : null}
       </span>
-      <span className="truncate">{label}</span>
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+      {meta ? <span className="shrink-0 text-xs text-muted-foreground">{meta}</span> : null}
     </Button>
   );
+}
+
+function buildRegionCountLabel(regionId: string, inspection: ConfigInspectionResult | null, isInspecting: boolean) {
+  if (isInspecting) return "解析中";
+  if (!inspection) return null;
+
+  const regionCount = inspection.regionCounts.find((region) => region.regionId === regionId);
+  if (!regionCount) return "0";
+  return `${regionCount.matchedNodeCount}`;
 }
 
 function PreviewRow({
