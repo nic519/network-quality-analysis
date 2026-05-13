@@ -22,11 +22,21 @@ export async function createProbeConfigSplit(
 ): Promise<ProbeConfigSplit | null> {
   const cachedProxyIdSet = new Set(cachedProxyIds.map((id) => id.trim()).filter(Boolean));
   if (!cachedProxyIdSet.size) return null;
-  if (configPath.includes(",")) return null;
+  if (configPath.includes(",")) {
+    throw new Error("无法按 proxyId 拆分多个配置路径，请先使用单一 Clash/Mihomo 配置再启用出口 IP 缓存复用。");
+  }
 
   const raw = await loadConfigText(configPath, options);
   const parsed = YAML.parse(raw);
-  if (!isRecord(parsed) || hasProxyProviders(parsed) || !Array.isArray(parsed.proxies)) return null;
+  if (!isRecord(parsed)) {
+    throw new Error("无法按 proxyId 拆分配置：配置内容不是有效对象。");
+  }
+  if (hasProxyProviders(parsed)) {
+    throw new Error("无法按 proxyId 拆分包含 proxy-providers 的配置，请先展开为静态 proxies 后再启用出口 IP 缓存复用。");
+  }
+  if (!Array.isArray(parsed.proxies)) {
+    throw new Error("无法按 proxyId 拆分配置：未找到静态 proxies 列表。");
+  }
 
   const cachedProxies: unknown[] = [];
   const probeProxies: unknown[] = [];

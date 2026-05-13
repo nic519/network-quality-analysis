@@ -275,22 +275,7 @@ export function AnalysisView({
                           width={220}
                           tick={<ChartYAxisTick />}
                         />
-                        <Tooltip
-                          cursor={{ fill: "rgba(120, 120, 128, 0.10)" }}
-                          content={({ active, payload }) => {
-                            if (!active || !payload?.length) return null;
-                            const row = payload[0]?.payload as LatencyChartRow;
-                            return (
-                              <div className="rounded-md border border-border bg-card px-3 py-2 text-sm">
-                                <div className="max-w-64 truncate font-medium text-foreground">{row.proxyName}</div>
-                                <div className="mt-1 text-muted-foreground">
-                                  {row.proxyType} / {row.regionLabel} / {selectedSite?.name}
-                                </div>
-                                <div className="mt-1 font-semibold text-primary">{row.latencyLabel}</div>
-                              </div>
-                            );
-                          }}
-                        />
+                        <Tooltip cursor={{ fill: "rgba(120, 120, 128, 0.10)" }} content={<LatencyTooltipContent />} />
                         <Bar dataKey="latency" fill="hsl(var(--primary))" radius={[0, 6, 6, 0]} barSize={22}>
                           <LabelList dataKey="proxyType" position="insideLeft" className="fill-primary-foreground text-xs font-semibold" />
                           <LabelList dataKey="latencyLabel" position="right" className="fill-current text-xs font-medium text-foreground" />
@@ -619,7 +604,26 @@ function compareProbeRows(left: ReturnType<typeof makeProbeRow>, right: ReturnTy
   return left.proxyName.localeCompare(right.proxyName, "zh-CN");
 }
 
-function buildRunScopedChartRows(
+export function LatencyTooltipContent({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: Array<{ payload?: LatencyChartRow }>;
+}) {
+  if (!active || !payload?.length) return null;
+  const row = payload[0]?.payload;
+  if (!row) return null;
+
+  return (
+    <div className="rounded-md border border-border bg-card px-3 py-2 text-sm">
+      <div className="max-w-64 truncate font-medium text-foreground">{row.proxyName}</div>
+      <div className="mt-1 max-w-64 break-all font-semibold text-primary">出口 IP：{row.probeIp?.trim() || "未获取"}</div>
+    </div>
+  );
+}
+
+export function buildRunScopedChartRows(
   results: AppState["results"],
   search: string,
   siteName?: string,
@@ -638,6 +642,7 @@ function buildRunScopedChartRows(
       proxyName: result.proxyName,
       proxyType: result.proxyType,
       regionLabel: result.regionLabel,
+      probeIp: result.probeIp,
       latency,
       latencyLabel: result.latency,
       isAvailable: latency !== null,

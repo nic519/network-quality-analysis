@@ -502,8 +502,8 @@ describe("runLatencyTest", () => {
     });
   });
 
-  test("retries without probe flags when the installed clash-speedtest is older", async () => {
-    const root = join(tmpdir(), `latency-runner-old-probe-${Date.now()}`);
+  test("does not retry without probe flags when clash-speedtest rejects required options", async () => {
+    const root = join(tmpdir(), `latency-runner-required-probe-${Date.now()}`);
     const binaryPath = join(root, "clash-speedtest");
     const configPath = join(root, "config.yaml");
     mkdirSync(root, { recursive: true });
@@ -511,31 +511,29 @@ describe("runLatencyTest", () => {
     writeFileSync(configPath, "");
     const calls: string[][] = [];
 
-    await runLatencyTest(
-      {
-        configPath,
-        regionIds: ["hong-kong"],
-      },
-      {
-        binaryPath,
-        sites: [site],
-        execute: async (_binary, args) => {
-          calls.push(args);
-          if (args.includes("--probe-url")) {
-            throw new Error("clash-speedtest exited with 2: flag provided but not defined: -probe-url");
-          }
-          return "序号\t节点名称\t类型\t延迟\n1.\tHK-01\tTrojan\t128ms\n";
+    await expect(
+      runLatencyTest(
+        {
+          configPath,
+          regionIds: ["hong-kong"],
         },
-      },
-    );
+        {
+          binaryPath,
+          sites: [site],
+          execute: async (_binary, args) => {
+            calls.push(args);
+            throw new Error("clash-speedtest exited with 2: flag provided but not defined: -probe-url");
+          },
+        },
+      ),
+    ).rejects.toThrow("flag provided but not defined: -probe-url");
 
-    expect(calls).toHaveLength(2);
+    expect(calls).toHaveLength(1);
     expect(calls[0]).toContain("--probe-url");
-    expect(calls[1]).not.toContain("--probe-url");
   });
 
-  test("retries without proxy concurrency when the installed clash-speedtest is older", async () => {
-    const root = join(tmpdir(), `latency-runner-old-proxy-concurrent-${Date.now()}`);
+  test("does not retry without proxy concurrency when clash-speedtest rejects required options", async () => {
+    const root = join(tmpdir(), `latency-runner-required-proxy-concurrent-${Date.now()}`);
     const binaryPath = join(root, "clash-speedtest");
     const configPath = join(root, "config.yaml");
     mkdirSync(root, { recursive: true });
@@ -543,28 +541,56 @@ describe("runLatencyTest", () => {
     writeFileSync(configPath, "");
     const calls: string[][] = [];
 
-    await runLatencyTest(
-      {
-        configPath,
-        regionIds: ["hong-kong"],
-      },
-      {
-        binaryPath,
-        sites: [site],
-        execute: async (_binary, args) => {
-          calls.push(args);
-          if (args.includes("--proxy-concurrent")) {
-            throw new Error("clash-speedtest exited with 2: flag provided but not defined: -proxy-concurrent");
-          }
-          return "序号\t节点名称\t类型\t延迟\n1.\tHK-01\tTrojan\t128ms\n";
+    await expect(
+      runLatencyTest(
+        {
+          configPath,
+          regionIds: ["hong-kong"],
         },
-      },
+        {
+          binaryPath,
+          sites: [site],
+          execute: async (_binary, args) => {
+            calls.push(args);
+            throw new Error("clash-speedtest exited with 2: flag provided but not defined: -proxy-concurrent");
+          },
+        },
+      ),
+    ).rejects.toThrow("flag provided but not defined: -proxy-concurrent");
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toContain("--proxy-concurrent");
+  });
+
+  test("fails when cached probe ids are provided but the config cannot be split safely", async () => {
+    const root = join(tmpdir(), `latency-runner-proxy-provider-cache-${Date.now()}`);
+    const binaryPath = join(root, "clash-speedtest");
+    const configPath = join(root, "config.yaml");
+    mkdirSync(root, { recursive: true });
+    writeFileSync(binaryPath, "");
+    writeFileSync(
+      configPath,
+      YAML.stringify({
+        "proxy-providers": {
+          sub: { type: "http", url: "https://example.com/sub.yaml", path: "./sub.yaml" },
+        },
+      }),
     );
 
-    expect(calls).toHaveLength(2);
-    expect(calls[0]).toContain("--proxy-concurrent");
-    expect(calls[1]).not.toContain("--proxy-concurrent");
-    expect(calls[1]).toContain("--probe-url");
+    await expect(
+      runLatencyTest(
+        {
+          configPath,
+          regionIds: ["hong-kong"],
+        },
+        {
+          binaryPath,
+          sites: [site],
+          cachedProbeProxyIds: ["cached-proxy-id"],
+          execute: async () => "序号\t节点名称\t类型\t延迟\n1.\tHK-01\tTrojan\t128ms\n",
+        },
+      ),
+    ).rejects.toThrow("无法按 proxyId 拆分");
   });
 
   test("streams clash-speedtest output into progress messages", async () => {

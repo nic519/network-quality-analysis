@@ -106,10 +106,7 @@ export async function runLatencyTest(request: RunRequest, options: RunnerOptions
   const normalizedProbeSettings = normalizeProbeSettings(options.probeSettings);
   const probeConfigSplit =
     normalizedProbeSettings.enabled && options.cachedProbeProxyIds?.length
-      ? await createProbeConfigSplit(configPath, options.cachedProbeProxyIds).catch((error) => {
-          options.onProgress?.(`出口 IP 缓存配置拆分失败，已降级为全量探测：${error instanceof Error ? error.message : String(error)}`);
-          return null;
-        })
+      ? await createProbeConfigSplit(configPath, options.cachedProbeProxyIds)
       : null;
   const selectedRegions = REGION_PRESETS.filter((region) => request.regionIds.includes(region.id));
   const totalGroups = selectedRegions.length * sites.length;
@@ -191,10 +188,7 @@ export async function runLatencyTest(request: RunRequest, options: RunnerOptions
             includeProbe: commandPlan.includeProbe,
           });
           emitTextProgress(`运行 ${formatSpeedtestCommand(args)}`);
-          const raw = await executeWithOptionalFlagFallback(binaryPath, args, execute, {
-            ...options,
-            onProgress: emitTextProgress,
-          });
+          const raw = await execute(binaryPath, args, { onProgress: emitTextProgress });
           siteRows.push(...normalizeSpeedtestRows(raw, activeRun.id, region, site));
         }
         results.push(...siteRows);
@@ -302,9 +296,11 @@ function calculateNodeWeightedProgressPercent({
   pendingGroupsCount: number;
   knownNodeCountHints: number[];
 }) {
-  const fallbackNodeCount = averageNodeCount(knownNodeCountHints) || activeGroupEstimatedNodeCount || DEFAULT_NODE_COUNT_ESTIMATE;
+  const estimatedNodeCountForUnknownGroups =
+    averageNodeCount(knownNodeCountHints) || activeGroupEstimatedNodeCount || DEFAULT_NODE_COUNT_ESTIMATE;
   const activeNodeBudget = activeGroupEstimatedNodeCount || 0;
-  const totalEstimatedNodeUnits = completedNodeUnits + activeNodeBudget + Math.max(0, pendingGroupsCount) * fallbackNodeCount;
+  const totalEstimatedNodeUnits =
+    completedNodeUnits + activeNodeBudget + Math.max(0, pendingGroupsCount) * estimatedNodeCountForUnknownGroups;
   if (totalEstimatedNodeUnits <= 0) return 0;
   const progressedNodeUnits = completedNodeUnits + Math.min(activeGroupNodeIndex, activeNodeBudget || activeGroupNodeIndex);
   return Math.max(0, Math.min(100, Math.round((progressedNodeUnits / totalEstimatedNodeUnits) * 100)));
@@ -345,62 +341,6 @@ function extractNodeSequenceFromProgressLine(message: string) {
   if (!match) return null;
   const sequence = Number(match[1]);
   return Number.isFinite(sequence) ? sequence : null;
-}
-
-async function executeWithOptionalFlagFallback(
-  binaryPath: string,
-  args: string[],
-  execute: NonNullable<RunnerOptions["execute"]>,
-  options: RunnerOptions,
-) {
-  let currentArgs = args;
-  const appliedFallbacks = new Set<OptionalFlagFallback>();
-
-  while (true) {
-    try {
-      return await execute(binaryPath, currentArgs, { onProgress: options.onProgress });
-    } catch (error) {
-      const fallback = getUnsupportedOptionalFlagFallback(error);
-      if (!fallback || appliedFallbacks.has(fallback)) throw error;
-
-      appliedFallbacks.add(fallback);
-      currentArgs = stripOptionalArgs(currentArgs, fallback);
-      options.onProgress?.(describeOptionalFlagFallback(fallback));
-      options.onProgress?.(`运行 ${formatSpeedtestCommand(currentArgs)}`);
-    }
-  }
-}
-
-type OptionalFlagFallback = "probe" | "proxy-concurrent";
-
-function getUnsupportedOptionalFlagFallback(error: unknown): OptionalFlagFallback | null {
-  const message = error instanceof Error ? error.message : String(error);
-  if (!message.includes("flag provided but not defined")) return null;
-  if (message.includes("probe")) return "probe";
-  if (message.includes("proxy-concurrent")) return "proxy-concurrent";
-  return null;
-}
-
-function stripOptionalArgs(args: string[], fallback: OptionalFlagFallback) {
-  const flags =
-    fallback === "probe"
-      ? new Set(["--probe-url", "--probe-method", "--probe-timeout", "--probe-fields"])
-      : new Set(["--proxy-concurrent"]);
-  const stripped: string[] = [];
-  for (let index = 0; index < args.length; index += 1) {
-    const arg = args[index];
-    if (flags.has(arg)) {
-      index += 1;
-      continue;
-    }
-    stripped.push(arg);
-  }
-  return stripped;
-}
-
-function describeOptionalFlagFallback(fallback: OptionalFlagFallback) {
-  if (fallback === "probe") return "当前 clash-speedtest 不支持 probe 参数，已降级为仅测速模式。";
-  return "当前 clash-speedtest 不支持节点并发参数，已降级为串行节点测速。";
 }
 
 export function validateRunnableInputs(binaryPath: string, configPath: string) {

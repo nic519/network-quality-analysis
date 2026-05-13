@@ -1,12 +1,67 @@
 import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { AnalysisView, buildProbeRows, buildProbeSummary } from "./analysis-view";
+import { AnalysisView, LatencyTooltipContent, buildProbeRows, buildProbeSummary, buildRunScopedChartRows } from "./analysis-view";
 import { ProbeDetailsPanel } from "./probe-details-panel";
 import type { AppState } from "../../../shared/rpc";
 import { DEFAULT_PROBE_SETTINGS } from "../../../shared/probe-settings";
 import { DEFAULT_SITES, REGION_PRESETS, type ResultRow } from "../../../shared/domain";
 
 describe("AnalysisView", () => {
+  test("shows only the node title and probe IP in the latency tooltip", () => {
+    const [row] = buildRunScopedChartRows(
+      [
+        makeResult({
+          proxyName: "🐦-vless台湾01",
+          proxyType: "Vless",
+          regionLabel: "台湾",
+          siteName: "YouTube",
+          latency: "133ms",
+          probeIp: "36.231.118.136",
+        }),
+      ],
+      "",
+      "YouTube",
+    );
+
+    const html = renderToStaticMarkup(<LatencyTooltipContent active payload={[{ payload: row }]} />);
+
+    expect(html).toContain("🐦-vless台湾01");
+    expect(html).toContain("36.231.118.136");
+    expect(html).not.toContain("Vless / 台湾 / YouTube");
+    expect(html).not.toContain("133ms");
+  });
+
+  test("renders probe IP in the failed records table", () => {
+    const html = renderToStaticMarkup(
+      <AnalysisView
+        state={makeState([
+          makeResult({
+            proxyId: "proxy-tw-01",
+            proxyName: "TW-01",
+            latency: "N/A",
+            probeIp: "36.231.118.136",
+          }),
+        ])}
+        selectedRunId="run-1"
+        onSelectedRunIdChange={() => {}}
+        fromDate="2026-05-13"
+        toDate="2026-05-13"
+        onFromDateChange={() => {}}
+        onToDateChange={() => {}}
+        search=""
+        onSearchChange={() => {}}
+        selectedSiteId="youtube"
+        onSelectedSiteIdChange={() => {}}
+        error={null}
+        onCopyResults={() => {}}
+      />,
+    );
+
+    expect(html).toContain("失败记录");
+    expect(html).toContain(">出口 IP</th>");
+    expect(html).toContain("36.231.118.136");
+  });
+
   test("does not render recommendation ranking cards in history view", () => {
     const html = renderToStaticMarkup(
       <AnalysisView

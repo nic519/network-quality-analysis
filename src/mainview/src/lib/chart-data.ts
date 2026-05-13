@@ -16,6 +16,7 @@ export type LatencyChartRow = {
   proxyName: string;
   proxyType: string;
   regionLabel: string;
+  probeIp?: string;
   latency: number | null;
   latencyLabel: string;
   isAvailable: boolean;
