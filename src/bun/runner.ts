@@ -13,6 +13,7 @@ import {
 } from "../shared/domain";
 import { DEFAULT_PROBE_SETTINGS, normalizeProbeSettings, type ProbeSettings } from "../shared/probe-settings";
 import type { RunProgressState } from "../shared/rpc";
+import { createProbeConfigSplit } from "./proxy-config";
 
 const DEFAULT_PROXY_CONCURRENT = "2";
 const DEFAULT_NODE_COUNT_ESTIMATE = 4;
@@ -31,6 +32,8 @@ export type RunnerOptions = {
   onProgress?: (message: string) => void;
   onStructuredProgress?: (progress: RunProgressState) => void;
   probeSettings?: ProbeSettings;
+  // 已有出口 IP 的 proxyId。proxyId 表示节点连接身份，不是节点名；runner 会用它拆出未探测节点配置。
+  cachedProbeProxyIds?: string[];
 };
 
 export type RunOutput = {
@@ -100,6 +103,14 @@ export async function runLatencyTest(request: RunRequest, options: RunnerOptions
   if (!sites.length) {
     throw new Error("请至少启用一个测试网站");
   }
+  const normalizedProbeSettings = normalizeProbeSettings(options.probeSettings);
+  const probeConfigSplit =
+    normalizedProbeSettings.enabled && options.cachedProbeProxyIds?.length
+      ? await createProbeConfigSplit(configPath, options.cachedProbeProxyIds).catch((error) => {
+          options.onProgress?.(`出口 IP 缓存配置拆分失败，已降级为全量探测：${error instanceof Error ? error.message : String(error)}`);
+          return null;
+        })
+      : null;
   const selectedRegions = REGION_PRESETS.filter((region) => request.regionIds.includes(region.id));
   const totalGroups = selectedRegions.length * sites.length;
   const runs: RunRecord[] = [];
@@ -148,7 +159,7 @@ export async function runLatencyTest(request: RunRequest, options: RunnerOptions
     for (const region of selectedRegions) {
       activeRun = createRegionRun(now(), region);
       runs.push(activeRun);
-      let includeProbeForRegion = normalizeProbeSettings(options.probeSettings).enabled;
+      let includeProbeForRegion = normalizedProbeSettings.enabled;
 
       for (const site of sites) {
         activeGroup = { region, site };
@@ -173,20 +184,24 @@ export async function runLatencyTest(request: RunRequest, options: RunnerOptions
           message: `正在测试 ${region.label} -> ${site.name} (${completedGroups + 1}/${totalGroups})`,
         });
         emitTextProgress(`测试 ${region.label} -> ${site.name}`);
-        const args = buildSpeedtestArgs(configPath, region, site, options.probeSettings, {
-          includeProbe: includeProbeForRegion,
-        });
-        emitTextProgress(`运行 ${formatSpeedtestCommand(args)}`);
-        const raw = await executeWithOptionalFlagFallback(binaryPath, args, execute, {
-          ...options,
-          onProgress: emitTextProgress,
-        });
-        const rows = normalizeSpeedtestRows(raw, activeRun.id, region, site);
-        results.push(...rows);
-        regionNodeCountHints.set(region.id, rows.length);
-        completedNodeUnits += rows.length;
-        activeGroupNodeIndex = rows.length;
-        activeGroupEstimatedNodeCount = rows.length;
+        const commandPlans = buildSpeedtestCommandPlans(configPath, includeProbeForRegion, probeConfigSplit);
+        const siteRows: ResultRow[] = [];
+        for (const commandPlan of commandPlans) {
+          const args = buildSpeedtestArgs(commandPlan.configPath, region, site, options.probeSettings, {
+            includeProbe: commandPlan.includeProbe,
+          });
+          emitTextProgress(`运行 ${formatSpeedtestCommand(args)}`);
+          const raw = await executeWithOptionalFlagFallback(binaryPath, args, execute, {
+            ...options,
+            onProgress: emitTextProgress,
+          });
+          siteRows.push(...normalizeSpeedtestRows(raw, activeRun.id, region, site));
+        }
+        results.push(...siteRows);
+        regionNodeCountHints.set(region.id, siteRows.length);
+        completedNodeUnits += siteRows.length;
+        activeGroupNodeIndex = siteRows.length;
+        activeGroupEstimatedNodeCount = siteRows.length;
         completedGroups += 1;
         activeGroup = null;
         includeProbeForRegion = false;
@@ -236,6 +251,8 @@ export async function runLatencyTest(request: RunRequest, options: RunnerOptions
     });
     const run = activeRun ?? runs[0] ?? createEmptyRun(now(), request.regionIds);
     throw Object.assign(error instanceof Error ? error : new Error(String(error)), { run, runs, results });
+  } finally {
+    await probeConfigSplit?.cleanup();
   }
 }
 
@@ -296,6 +313,23 @@ function calculateNodeWeightedProgressPercent({
 function averageNodeCount(values: number[]) {
   if (!values.length) return null;
   return Math.max(1, Math.round(values.reduce((sum, value) => sum + value, 0) / values.length));
+}
+
+function buildSpeedtestCommandPlans(
+  configPath: string,
+  includeProbe: boolean,
+  probeConfigSplit: Awaited<ReturnType<typeof createProbeConfigSplit>>,
+) {
+  if (!includeProbe || !probeConfigSplit) return [{ configPath, includeProbe }];
+
+  const plans: Array<{ configPath: string; includeProbe: boolean }> = [];
+  if (probeConfigSplit.probeConfigPath) {
+    plans.push({ configPath: probeConfigSplit.probeConfigPath, includeProbe: true });
+  }
+  if (probeConfigSplit.cachedConfigPath) {
+    plans.push({ configPath: probeConfigSplit.cachedConfigPath, includeProbe: false });
+  }
+  return plans.length ? plans : [{ configPath, includeProbe: false }];
 }
 
 function estimateNodeCount(currentNodeIndex: number, knownRegionNodeCount: number | null, knownNodeHints: number[]) {

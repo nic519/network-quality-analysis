@@ -27,17 +27,17 @@ type ResultDbRow = {
   packet_loss: string;
   download_speed: string;
   upload_speed: string;
-  probe_url: string;
-  probe_latency: string;
-  probe_status: string;
-  probe_error: string;
-  probe_ip: string;
-  probe_country: string;
-  probe_country_code: string;
-  probe_region: string;
-  probe_city: string;
-  probe_asn: string;
-  probe_org: string;
+  probe_url: string | null;
+  probe_latency: string | null;
+  probe_status: string | null;
+  probe_error: string | null;
+  probe_ip: string | null;
+  probe_country: string | null;
+  probe_country_code: string | null;
+  probe_region: string | null;
+  probe_city: string | null;
+  probe_asn: string | null;
+  probe_org: string | null;
 };
 
 type ConfigHistoryRow = {
@@ -81,7 +81,11 @@ export class LatencyDatabase {
         jitter TEXT NOT NULL,
         packet_loss TEXT NOT NULL,
         download_speed TEXT NOT NULL,
-        upload_speed TEXT NOT NULL,
+        upload_speed TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS probe_results (
+        proxy_id TEXT PRIMARY KEY,
         probe_url TEXT NOT NULL DEFAULT '',
         probe_latency TEXT NOT NULL DEFAULT '',
         probe_status TEXT NOT NULL DEFAULT '',
@@ -92,12 +96,14 @@ export class LatencyDatabase {
         probe_region TEXT NOT NULL DEFAULT '',
         probe_city TEXT NOT NULL DEFAULT '',
         probe_asn TEXT NOT NULL DEFAULT '',
-        probe_org TEXT NOT NULL DEFAULT ''
+        probe_org TEXT NOT NULL DEFAULT '',
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
 
       CREATE INDEX IF NOT EXISTS idx_results_run ON results(run_id);
       CREATE INDEX IF NOT EXISTS idx_results_region ON results(region_id);
       CREATE INDEX IF NOT EXISTS idx_results_proxy_id ON results(proxy_id);
+      CREATE INDEX IF NOT EXISTS idx_probe_results_probe_ip ON probe_results(probe_ip);
       CREATE INDEX IF NOT EXISTS idx_runs_started_at ON runs(started_at);
 
       CREATE TABLE IF NOT EXISTS config_history (
@@ -109,17 +115,9 @@ export class LatencyDatabase {
       CREATE INDEX IF NOT EXISTS idx_config_history_last_used_at ON config_history(last_used_at);
     `);
     this.addColumnIfMissing("results", "proxy_id", "TEXT NOT NULL DEFAULT ''");
-    this.addColumnIfMissing("results", "probe_url", "TEXT NOT NULL DEFAULT ''");
-    this.addColumnIfMissing("results", "probe_latency", "TEXT NOT NULL DEFAULT ''");
-    this.addColumnIfMissing("results", "probe_status", "TEXT NOT NULL DEFAULT ''");
-    this.addColumnIfMissing("results", "probe_error", "TEXT NOT NULL DEFAULT ''");
-    this.addColumnIfMissing("results", "probe_ip", "TEXT NOT NULL DEFAULT ''");
-    this.addColumnIfMissing("results", "probe_country", "TEXT NOT NULL DEFAULT ''");
-    this.addColumnIfMissing("results", "probe_country_code", "TEXT NOT NULL DEFAULT ''");
-    this.addColumnIfMissing("results", "probe_region", "TEXT NOT NULL DEFAULT ''");
-    this.addColumnIfMissing("results", "probe_city", "TEXT NOT NULL DEFAULT ''");
-    this.addColumnIfMissing("results", "probe_asn", "TEXT NOT NULL DEFAULT ''");
-    this.addColumnIfMissing("results", "probe_org", "TEXT NOT NULL DEFAULT ''");
+    this.backfillProbeResultsFromLegacyColumns();
+    this.removeLegacyProbeColumnsFromResults();
+    this.ensureResultIndexes();
   }
 
   close() {
@@ -164,18 +162,7 @@ export class LatencyDatabase {
         jitter,
         packet_loss,
         download_speed,
-        upload_speed,
-        probe_url,
-        probe_latency,
-        probe_status,
-        probe_error,
-        probe_ip,
-        probe_country,
-        probe_country_code,
-        probe_region,
-        probe_city,
-        probe_asn,
-        probe_org
+        upload_speed
       )
       VALUES (
         $runId,
@@ -192,7 +179,28 @@ export class LatencyDatabase {
         $jitter,
         $packetLoss,
         $downloadSpeed,
-        $uploadSpeed,
+        $uploadSpeed
+      )
+    `);
+
+    const upsertProbe = this.db.query(`
+      INSERT INTO probe_results (
+        proxy_id,
+        probe_url,
+        probe_latency,
+        probe_status,
+        probe_error,
+        probe_ip,
+        probe_country,
+        probe_country_code,
+        probe_region,
+        probe_city,
+        probe_asn,
+        probe_org,
+        updated_at
+      )
+      VALUES (
+        $proxyId,
         $probeUrl,
         $probeLatency,
         $probeStatus,
@@ -203,8 +211,22 @@ export class LatencyDatabase {
         $probeRegion,
         $probeCity,
         $probeAsn,
-        $probeOrg
+        $probeOrg,
+        $updatedAt
       )
+      ON CONFLICT(proxy_id) DO UPDATE SET
+        probe_url = excluded.probe_url,
+        probe_latency = excluded.probe_latency,
+        probe_status = excluded.probe_status,
+        probe_error = excluded.probe_error,
+        probe_ip = excluded.probe_ip,
+        probe_country = excluded.probe_country,
+        probe_country_code = excluded.probe_country_code,
+        probe_region = excluded.probe_region,
+        probe_city = excluded.probe_city,
+        probe_asn = excluded.probe_asn,
+        probe_org = excluded.probe_org,
+        updated_at = excluded.updated_at
     `);
 
     const transaction = this.db.transaction((items: ResultRow[]) => {
@@ -225,6 +247,10 @@ export class LatencyDatabase {
           $packetLoss: row.packetLoss,
           $downloadSpeed: row.downloadSpeed,
           $uploadSpeed: row.uploadSpeed,
+        });
+        if (!row.proxyId || !hasProbeEvidence(row)) continue;
+        upsertProbe.run({
+          $proxyId: row.proxyId,
           $probeUrl: row.probeUrl ?? "",
           $probeLatency: row.probeLatency ?? "",
           $probeStatus: row.probeStatus ?? "",
@@ -236,11 +262,30 @@ export class LatencyDatabase {
           $probeCity: row.probeCity ?? "",
           $probeAsn: row.probeAsn ?? "",
           $probeOrg: row.probeOrg ?? "",
+          $updatedAt: new Date().toISOString(),
         });
       }
     });
 
     transaction(rows);
+  }
+
+  listCachedProbeProxyIds(): string[] {
+    // 这里只返回已有出口 IP 的 proxyId。proxyId 是节点连接身份缓存键，
+    // 后续 probe 前会据此把已探测节点排除，而不是依赖节点名。
+    const rows = this.db
+      .query<{ proxy_id: string }, []>(`
+        SELECT proxy_id
+        FROM probe_results
+        WHERE probe_ip <> ''
+        ORDER BY proxy_id
+      `)
+      .all();
+    return rows.map((row) => row.proxy_id);
+  }
+
+  listResultColumnNames(): string[] {
+    return this.db.query<{ name: string }, []>("PRAGMA table_info(results)").all().map((column) => column.name);
   }
 
   saveConfigHistory(path: string, lastUsedAt = new Date().toISOString()) {
@@ -322,9 +367,36 @@ export class LatencyDatabase {
     const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
     const rows = this.db
       .query<ResultDbRow, Record<string, string>>(`
-        SELECT results.*
+        SELECT
+          results.run_id,
+          results.region_id,
+          results.region_label,
+          results.site_id,
+          results.site_name,
+          results.site_url,
+          results.sequence,
+          results.proxy_id,
+          results.proxy_name,
+          results.proxy_type,
+          results.latency,
+          results.jitter,
+          results.packet_loss,
+          results.download_speed,
+          results.upload_speed,
+          probe_results.probe_url,
+          probe_results.probe_latency,
+          probe_results.probe_status,
+          probe_results.probe_error,
+          probe_results.probe_ip,
+          probe_results.probe_country,
+          probe_results.probe_country_code,
+          probe_results.probe_region,
+          probe_results.probe_city,
+          probe_results.probe_asn,
+          probe_results.probe_org
         FROM results
         JOIN runs ON runs.id = results.run_id
+        LEFT JOIN probe_results ON probe_results.proxy_id = results.proxy_id
         ${where}
         ORDER BY runs.started_at DESC, results.region_id, results.site_id, CAST(REPLACE(results.sequence, '.', '') AS INTEGER)
       `)
@@ -338,6 +410,125 @@ export class LatencyDatabase {
     if (columns.some((column) => column.name === columnName)) return;
     this.db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${definition}`);
   }
+
+  private backfillProbeResultsFromLegacyColumns() {
+    const columns = this.listResultColumnNames();
+    if (!columns.includes("probe_ip")) return;
+
+    this.db.exec(`
+      INSERT INTO probe_results (
+        proxy_id,
+        probe_url,
+        probe_latency,
+        probe_status,
+        probe_error,
+        probe_ip,
+        probe_country,
+        probe_country_code,
+        probe_region,
+        probe_city,
+        probe_asn,
+        probe_org,
+        updated_at
+      )
+      SELECT
+        proxy_id,
+        probe_url,
+        probe_latency,
+        probe_status,
+        probe_error,
+        probe_ip,
+        probe_country,
+        probe_country_code,
+        probe_region,
+        probe_city,
+        probe_asn,
+        probe_org,
+        CURRENT_TIMESTAMP
+      FROM results
+      WHERE proxy_id <> ''
+        AND (probe_ip <> '' OR probe_status <> '' OR probe_error <> '')
+      ON CONFLICT(proxy_id) DO NOTHING
+    `);
+  }
+
+  private removeLegacyProbeColumnsFromResults() {
+    const columns = this.listResultColumnNames();
+    if (!columns.includes("probe_ip")) return;
+
+    this.db.exec(`
+      CREATE TABLE results_without_probe_columns (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+        region_id TEXT NOT NULL,
+        region_label TEXT NOT NULL,
+        site_id TEXT NOT NULL,
+        site_name TEXT NOT NULL,
+        site_url TEXT NOT NULL,
+        sequence TEXT NOT NULL,
+        proxy_id TEXT NOT NULL DEFAULT '',
+        proxy_name TEXT NOT NULL,
+        proxy_type TEXT NOT NULL,
+        latency TEXT NOT NULL,
+        jitter TEXT NOT NULL,
+        packet_loss TEXT NOT NULL,
+        download_speed TEXT NOT NULL,
+        upload_speed TEXT NOT NULL
+      );
+
+      INSERT INTO results_without_probe_columns (
+        id,
+        run_id,
+        region_id,
+        region_label,
+        site_id,
+        site_name,
+        site_url,
+        sequence,
+        proxy_id,
+        proxy_name,
+        proxy_type,
+        latency,
+        jitter,
+        packet_loss,
+        download_speed,
+        upload_speed
+      )
+      SELECT
+        id,
+        run_id,
+        region_id,
+        region_label,
+        site_id,
+        site_name,
+        site_url,
+        sequence,
+        proxy_id,
+        proxy_name,
+        proxy_type,
+        latency,
+        jitter,
+        packet_loss,
+        download_speed,
+        upload_speed
+      FROM results;
+
+      DROP TABLE results;
+      ALTER TABLE results_without_probe_columns RENAME TO results;
+    `);
+  }
+
+  private ensureResultIndexes() {
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_results_run ON results(run_id);
+      CREATE INDEX IF NOT EXISTS idx_results_region ON results(region_id);
+      CREATE INDEX IF NOT EXISTS idx_results_proxy_id ON results(proxy_id);
+    `);
+  }
+}
+
+function hasProbeEvidence(row: ResultRow) {
+  return Boolean(row.probeIp || row.probeStatus || row.probeError);
 }
 
 function fromDbRow(row: ResultDbRow): ResultRow {
@@ -357,16 +548,16 @@ function fromDbRow(row: ResultDbRow): ResultRow {
     packetLoss: row.packet_loss,
     downloadSpeed: row.download_speed,
     uploadSpeed: row.upload_speed,
-    probeUrl: row.probe_url,
-    probeLatency: row.probe_latency,
-    probeStatus: row.probe_status,
-    probeError: row.probe_error,
-    probeIp: row.probe_ip,
-    probeCountry: row.probe_country,
-    probeCountryCode: row.probe_country_code,
-    probeRegion: row.probe_region,
-    probeCity: row.probe_city,
-    probeAsn: row.probe_asn,
-    probeOrg: row.probe_org,
+    probeUrl: row.probe_url ?? "",
+    probeLatency: row.probe_latency ?? "",
+    probeStatus: row.probe_status ?? "",
+    probeError: row.probe_error ?? "",
+    probeIp: row.probe_ip ?? "",
+    probeCountry: row.probe_country ?? "",
+    probeCountryCode: row.probe_country_code ?? "",
+    probeRegion: row.probe_region ?? "",
+    probeCity: row.probe_city ?? "",
+    probeAsn: row.probe_asn ?? "",
+    probeOrg: row.probe_org ?? "",
   };
 }

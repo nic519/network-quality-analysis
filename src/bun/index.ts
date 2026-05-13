@@ -128,6 +128,7 @@ const rpc = BrowserView.defineRPC<AppRPC>({
               binaryPath: manualClashSpeedtestPath && existsSync(manualClashSpeedtestPath) ? manualClashSpeedtestPath : undefined,
               sites: testSites,
               probeSettings,
+              cachedProbeProxyIds: db.listCachedProbeProxyIds(),
               onProgress: (message) => {
                 window.webview.rpc?.send.progress({ message });
               },

@@ -14,6 +14,8 @@ export type SiteDefinition = {
 
 export type SpeedtestRow = {
   sequence: string;
+  // proxyId 是 clash-speedtest 基于节点连接身份生成的稳定 ID。
+  // 它主要由协议、服务器、端口和认证/传输参数决定，不应把节点展示名当成同一性依据。
   proxyId: string;
   proxyName: string;
   proxyType: string;

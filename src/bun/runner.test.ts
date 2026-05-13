@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import YAML from "yaml";
 import { REGION_PRESETS, type SiteDefinition } from "../shared/domain";
 import { DEFAULT_PROBE_SETTINGS } from "../shared/probe-settings";
 import {
@@ -17,6 +19,30 @@ const site: SiteDefinition = {
   name: "YouTube",
   url: "https://www.youtube.com/generate_204",
 };
+
+function proxyIdForTest(proxy: Record<string, unknown>) {
+  const parts = [
+    `type=${valueStringForTest(proxy.type)}`,
+    `server=${valueStringForTest(proxy.server)}`,
+    `port=${valueStringForTest(proxy.port)}`,
+  ];
+  for (const key of ["network", "cipher", "uuid", "password", "username", "alterId", "sni", "servername", "ws-opts", "grpc-opts", "reality-opts"]) {
+    if (Object.hasOwn(proxy, key)) parts.push(`${key}=${valueStringForTest(proxy[key])}`);
+  }
+  return createHash("sha256").update(parts.join("|")).digest("hex").slice(0, 16);
+}
+
+function valueStringForTest(value: unknown): string {
+  if (value == null) return "";
+  if (Array.isArray(value)) return `[${value.map(valueStringForTest).join(",")}]`;
+  if (typeof value === "object") {
+    return `{${Object.keys(value)
+      .sort()
+      .map((key) => `${key}=${valueStringForTest((value as Record<string, unknown>)[key])}`)
+      .join(",")}}`;
+  }
+  return String(value).trim();
+}
 
 describe("buildSpeedtestArgs", () => {
   test("uses fast mode, the site's latency URL, and a short proxy timeout", () => {
@@ -75,6 +101,12 @@ describe("buildSpeedtestArgs", () => {
     expect(args).toContain("--latency-timeout");
     expect(args).not.toContain("--probe-url");
     expect(args).not.toContain("https://example.com/probe");
+  });
+
+  test("does not pass cached proxy ids as clash-speedtest flags", () => {
+    const args = buildSpeedtestArgs("config.yaml", REGION_PRESETS[0], site, DEFAULT_PROBE_SETTINGS);
+
+    expect(args).not.toContain("--probe-skip-proxy-ids");
   });
 });
 
@@ -189,6 +221,57 @@ describe("runLatencyTest", () => {
     expect(calls[0]).toContain("--probe-url");
     expect(calls[1]).not.toContain("--probe-url");
     expect(calls[1]).toContain("--latency-timeout");
+  });
+
+  test("probes only nodes without cached exit IP while still testing cached nodes", async () => {
+    const root = join(tmpdir(), `latency-runner-probe-cache-${Date.now()}`);
+    const binaryPath = join(root, "clash-speedtest");
+    const configPath = join(root, "config.yaml");
+    mkdirSync(root, { recursive: true });
+    writeFileSync(binaryPath, "");
+    const cachedProxy = { name: "HK-cached", type: "trojan", server: "cached.example.com", port: 443, password: "secret" };
+    const uncachedProxy = { name: "HK-uncached", type: "trojan", server: "uncached.example.com", port: 443, password: "secret" };
+    writeFileSync(configPath, YAML.stringify({ proxies: [cachedProxy, uncachedProxy] }));
+    const calls: Array<{ args: string[]; proxyNames: string[] }> = [];
+
+    const output = await runLatencyTest(
+      {
+        configPath,
+        regionIds: ["hong-kong"],
+      },
+      {
+        binaryPath,
+        sites: [site],
+        cachedProbeProxyIds: [proxyIdForTest(cachedProxy)],
+        execute: async (_binary, args) => {
+          const commandConfigPath = args[args.indexOf("-c") + 1];
+          const parsed = YAML.parse(readFileSync(commandConfigPath, "utf8")) as { proxies: Array<typeof cachedProxy> };
+          const proxyNames = parsed.proxies.map((proxy) => proxy.name);
+          calls.push({ args, proxyNames });
+          const hasProbe = args.includes("--probe-url");
+          const rows = parsed.proxies.map((proxy, index) =>
+            [
+              `${index + 1}.`,
+              proxyIdForTest(proxy),
+              proxy.name,
+              proxy.type,
+              "128ms",
+              hasProbe ? "203.0.113.10" : "",
+            ].join("\t"),
+          );
+          return ["序号\t节点ID\t节点名称\t类型\t延迟\tProbe.IP", ...rows].join("\n");
+        },
+      },
+    );
+
+    expect(calls).toHaveLength(2);
+    expect(calls[0].args).toContain("--probe-url");
+    expect(calls[0].args).not.toContain("--probe-skip-proxy-ids");
+    expect(calls[0].proxyNames).toEqual(["HK-uncached"]);
+    expect(calls[1].args).not.toContain("--probe-url");
+    expect(calls[1].args).not.toContain("--probe-skip-proxy-ids");
+    expect(calls[1].proxyNames).toEqual(["HK-cached"]);
+    expect(output.results.map((row) => row.proxyName).sort()).toEqual(["HK-cached", "HK-uncached"]);
   });
 
   test("skips disabled configured sites", async () => {

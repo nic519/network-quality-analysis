@@ -1,4 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import { Database } from "bun:sqlite";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { LatencyDatabase } from "./db";
 import type { ResultRow, RunRecord } from "../shared/domain";
 
@@ -49,7 +52,7 @@ describe("LatencyDatabase", () => {
     db.close();
   });
 
-  test("stores probe fields with each result row", () => {
+  test("stores probe fields in a proxy keyed table and joins them into query results", () => {
     const db = new LatencyDatabase();
     db.migrate();
 
@@ -81,6 +84,86 @@ describe("LatencyDatabase", () => {
       probeAsn: "AS64500",
       probeOrg: "Example Transit",
     });
+    expect(db.listCachedProbeProxyIds()).toEqual(["hong-kong-stable-id"]);
+
+    db.close();
+  });
+
+  test("keeps probe columns out of newly created results table", () => {
+    const db = new LatencyDatabase();
+    db.migrate();
+
+    expect(db.listResultColumnNames()).not.toContain("probe_ip");
+    expect(db.listResultColumnNames()).not.toContain("probe_url");
+
+    db.close();
+  });
+
+  test("migrates legacy probe columns into proxy keyed records and removes them from results", () => {
+    const path = join(tmpdir(), `latency-legacy-probe-${Date.now()}.sqlite`);
+    const raw = new Database(path, { create: true });
+    raw.exec(`
+      CREATE TABLE runs (
+        id TEXT PRIMARY KEY,
+        started_at TEXT NOT NULL,
+        completed_at TEXT,
+        status TEXT NOT NULL,
+        selected_regions TEXT NOT NULL,
+        error_message TEXT
+      );
+      CREATE TABLE results (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+        region_id TEXT NOT NULL,
+        region_label TEXT NOT NULL,
+        site_id TEXT NOT NULL,
+        site_name TEXT NOT NULL,
+        site_url TEXT NOT NULL,
+        sequence TEXT NOT NULL,
+        proxy_id TEXT NOT NULL DEFAULT '',
+        proxy_name TEXT NOT NULL,
+        proxy_type TEXT NOT NULL,
+        latency TEXT NOT NULL,
+        jitter TEXT NOT NULL,
+        packet_loss TEXT NOT NULL,
+        download_speed TEXT NOT NULL,
+        upload_speed TEXT NOT NULL,
+        probe_url TEXT NOT NULL DEFAULT '',
+        probe_latency TEXT NOT NULL DEFAULT '',
+        probe_status TEXT NOT NULL DEFAULT '',
+        probe_error TEXT NOT NULL DEFAULT '',
+        probe_ip TEXT NOT NULL DEFAULT '',
+        probe_country TEXT NOT NULL DEFAULT '',
+        probe_country_code TEXT NOT NULL DEFAULT '',
+        probe_region TEXT NOT NULL DEFAULT '',
+        probe_city TEXT NOT NULL DEFAULT '',
+        probe_asn TEXT NOT NULL DEFAULT '',
+        probe_org TEXT NOT NULL DEFAULT ''
+      );
+      INSERT INTO runs VALUES ('run-1', '2026-05-07T10:00:00.000Z', '2026-05-07T10:01:00.000Z', 'completed', '["hong-kong"]', NULL);
+      INSERT INTO results (
+        run_id, region_id, region_label, site_id, site_name, site_url, sequence, proxy_id, proxy_name, proxy_type,
+        latency, jitter, packet_loss, download_speed, upload_speed, probe_url, probe_latency, probe_status, probe_error,
+        probe_ip, probe_country, probe_country_code, probe_region, probe_city, probe_asn, probe_org
+      ) VALUES (
+        'run-1', 'hong-kong', '香港', 'youtube', 'YouTube', 'https://www.youtube.com/generate_204', '1.', 'legacy-proxy-id', 'HK-01', 'Trojan',
+        '128ms', 'N/A', '0.0%', 'N/A', 'N/A', 'https://ipapi.co/json/', '82ms', '200', '',
+        '203.0.113.10', 'Japan', 'JP', 'Tokyo', 'Tokyo', 'AS64500', 'Example Transit'
+      );
+    `);
+    raw.close();
+
+    const db = new LatencyDatabase(path);
+    db.migrate();
+
+    expect(db.listResultColumnNames()).not.toContain("probe_ip");
+    expect(db.queryResults({ runId: "run-1" })[0]).toMatchObject({
+      proxyId: "legacy-proxy-id",
+      probeIp: "203.0.113.10",
+      probeCountryCode: "JP",
+      probeOrg: "Example Transit",
+    });
+    expect(db.listCachedProbeProxyIds()).toEqual(["legacy-proxy-id"]);
 
     db.close();
   });
