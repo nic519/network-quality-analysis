@@ -403,7 +403,6 @@ function ProbeTable({ rows }: { rows: ReturnType<typeof buildProbeRows> }) {
           <TableRow className="hover:bg-transparent">
             <TableHead className="h-9 px-3 text-xs text-muted-foreground">节点</TableHead>
             <TableHead className="h-9 px-3 text-xs text-muted-foreground">出口 IP</TableHead>
-            <TableHead className="h-9 px-3 text-xs text-muted-foreground">地区</TableHead>
             <TableHead className="h-9 px-3 text-xs text-muted-foreground">ASN / 组织</TableHead>
             <TableHead className="h-9 px-3 text-xs text-muted-foreground">Probe</TableHead>
           </TableRow>
@@ -417,11 +416,8 @@ function ProbeTable({ rows }: { rows: ReturnType<typeof buildProbeRows> }) {
                 </div>
                 <div className="mt-0.5 text-xs leading-4 text-muted-foreground">{row.proxyType} / {row.regionLabel}</div>
               </TableCell>
-              <TableCell className="px-3 py-2 text-sm text-foreground">
-                <div className="break-all leading-5">{row.probeIp || "N/A"}</div>
-              </TableCell>
               <TableCell className="px-3 py-2">
-                <ProbeLocationCell row={row} />
+                <ProbeIpCell row={row} />
               </TableCell>
               <TableCell className="max-w-[260px] px-3 py-2">
                 <ProbeAsnCell row={row} />
@@ -437,17 +433,14 @@ function ProbeTable({ rows }: { rows: ReturnType<typeof buildProbeRows> }) {
   );
 }
 
-function ProbeLocationCell({ row }: { row: ReturnType<typeof buildProbeRows>[number] }) {
-  const [line1, line2] = formatProbeLocationLines(row);
-
-  if (!line1 && !line2) {
-    return <div className="text-sm leading-5 text-muted-foreground">N/A</div>;
-  }
+function ProbeIpCell({ row }: { row: ReturnType<typeof buildProbeRows>[number] }) {
+  const [locationLine1, locationLine2] = formatProbeLocationLines(row);
 
   return (
-    <div title={formatProbeLocationTitle(row)}>
-      {line1 ? <div className="text-sm leading-5 text-muted-foreground">{line1}</div> : null}
-      {line2 ? <div className="text-xs leading-4 text-muted-foreground">{line2}</div> : null}
+    <div title={[row.probeIp, formatProbeLocationTitle(row)].filter(Boolean).join(" / ") || "N/A"}>
+      <div className="break-all text-sm leading-5 text-foreground">{row.probeIp || "N/A"}</div>
+      {locationLine1 ? <div className="mt-0.5 text-xs leading-4 text-muted-foreground">{locationLine1}</div> : null}
+      {locationLine2 ? <div className="text-xs leading-4 text-muted-foreground">{locationLine2}</div> : null}
     </div>
   );
 }

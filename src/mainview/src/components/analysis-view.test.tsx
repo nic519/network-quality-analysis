@@ -120,8 +120,45 @@ describe("AnalysisView", () => {
     expect(html).toContain("California / Los Angeles");
     expect(html).toContain("AS36352");
     expect(html).toContain("HostPapa");
-    expect(html).toContain('class="text-sm leading-5 text-muted-foreground"');
+    expect(html).toContain('class="break-all text-sm leading-5 text-foreground"');
     expect(html).toContain('class="text-xs leading-4 text-muted-foreground"');
+  });
+
+  test("renders probe location below the IP instead of using a separate location column", () => {
+    const html = renderToStaticMarkup(
+      <AnalysisView
+        state={makeState([
+          makeResult({
+            proxyId: "proxy-us-01",
+            proxyName: "US-01",
+            probeIp: "23.94.213.251",
+            probeStatus: "200",
+            probeLatency: "698ms",
+            probeCountryCode: "US",
+            probeCountry: "United States",
+            probeRegion: "California",
+            probeCity: "Los Angeles",
+          }),
+        ])}
+        selectedRunId="run-1"
+        onSelectedRunIdChange={() => {}}
+        fromDate="2026-05-13"
+        toDate="2026-05-13"
+        onFromDateChange={() => {}}
+        onToDateChange={() => {}}
+        search=""
+        onSearchChange={() => {}}
+        selectedSiteId="youtube"
+        onSelectedSiteIdChange={() => {}}
+        error={null}
+        onCopyResults={() => {}}
+      />,
+    );
+
+    expect(html).not.toContain(">地区</th>");
+    expect(html).toContain("23.94.213.251");
+    expect(html).toContain("US / United States");
+    expect(html).toContain("California / Los Angeles");
   });
 
   test("renders every probe row without truncating the list", () => {
