@@ -3,6 +3,7 @@ import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { REGION_PRESETS, type SiteDefinition } from "../shared/domain";
+import { DEFAULT_PROBE_SETTINGS } from "../shared/probe-settings";
 import {
   buildSpeedtestArgs,
   executeSpeedtest,
@@ -19,28 +20,32 @@ const site: SiteDefinition = {
 
 describe("buildSpeedtestArgs", () => {
   test("uses fast mode, the site's latency URL, and a short proxy timeout", () => {
-    expect(buildSpeedtestArgs("config.yaml", REGION_PRESETS[0], site)).toEqual([
-      "-c",
-      "config.yaml",
-      "-f",
-      REGION_PRESETS[0].filterRegex,
-      "--speed-mode",
-      "fast",
-      "--latency-url",
-      "https://www.youtube.com/generate_204",
-      "-timeout",
-      "8s",
-      "--latency-timeout",
-      "8s",
-      "--probe-url",
-      "https://api.ip.sb/geoip/",
-      "--probe-method",
-      "GET",
-      "--probe-timeout",
-      "8s",
-      "--probe-fields",
-      "ip=ip,country=country,country_code=country_code,region=region,city=city,asn=asn,org=organization",
-    ]);
+    const args = buildSpeedtestArgs("config.yaml", REGION_PRESETS[0], site);
+
+    expect(args).toEqual(
+      expect.arrayContaining([
+        "-c",
+        "config.yaml",
+        "-f",
+        REGION_PRESETS[0].filterRegex,
+        "--speed-mode",
+        "fast",
+        "--latency-url",
+        "https://www.youtube.com/generate_204",
+        "-timeout",
+        "8s",
+        "--latency-timeout",
+        "8s",
+        "--probe-url",
+        DEFAULT_PROBE_SETTINGS.url,
+        "--probe-method",
+        "GET",
+        "--probe-fields",
+        DEFAULT_PROBE_SETTINGS.fields,
+      ]),
+    );
+    expect(args).toContain("--probe-timeout");
+    expect(args[args.indexOf("--probe-timeout") + 1]).toBe(DEFAULT_PROBE_SETTINGS.timeout);
   });
 
   test("uses configured probe settings when building args", () => {

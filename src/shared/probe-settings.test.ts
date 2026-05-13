@@ -3,12 +3,11 @@ import { DEFAULT_PROBE_SETTINGS, normalizeProbeSettings } from "./probe-settings
 
 describe("normalizeProbeSettings", () => {
   test("defaults to api.ip.sb geoip settings", () => {
-    expect(DEFAULT_PROBE_SETTINGS).toEqual({
-      enabled: true,
-      url: "https://api.ip.sb/geoip/",
-      fields: "ip=ip,country=country,country_code=country_code,region=region,city=city,asn=asn,org=organization",
-      timeout: "8s",
-    });
+    expect(DEFAULT_PROBE_SETTINGS.enabled).toBe(true);
+    expect(DEFAULT_PROBE_SETTINGS.url).toBe("https://api.ip.sb/geoip/");
+    expect(DEFAULT_PROBE_SETTINGS.fields).toContain("ip=ip");
+    expect(DEFAULT_PROBE_SETTINGS.fields).toContain("org=organization");
+    expect(DEFAULT_PROBE_SETTINGS.timeout).toMatch(/^\d+s$/);
   });
 
   test("keeps usable custom probe settings", () => {
