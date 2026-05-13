@@ -59,6 +59,18 @@ bun run build:web
 bun run dev
 ```
 
+## UI 组件约定
+
+本项目使用 shadcn/ui 风格组件，凡是 shadcn/Radix 已提供的常见 UI 模式，应优先使用或安装对应组件，不要先手写一套同类组件。常见例子包括弹窗、确认框、下拉菜单、表格、按钮、卡片、输入框、滚动区域等。
+
+新增 shadcn 组件时，使用项目包管理器运行：
+
+```bash
+bunx --bun shadcn@latest add <component>
+```
+
+组件应落在 `src/mainview/src/components/ui`。`components.json` 已配置为项目实际源码路径；如果 CLI 输出到了其它目录，需要先修正配置，不要保留重复 UI 组件。
+
 ## 发布构建
 
 推送任意 Git tag 都会触发 GitHub Actions 自动构建。tag 名称不再需要与 `package.json` 中的版本号保持一致。

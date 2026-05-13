@@ -1,5 +1,6 @@
-import { ArrowDownAZ, Timer, X } from "lucide-react";
+import { ArrowDownAZ, Timer } from "lucide-react";
 import { Button } from "./ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
 import { ScrollArea } from "./ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import type { ProbeRow, ProbeSortMode } from "./analysis-view";
@@ -17,50 +18,49 @@ export function ProbeDetailsPanel({
   onSortModeChange: (value: ProbeSortMode) => void;
   onClose: () => void;
 }) {
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/78 px-6 py-8 backdrop-blur-sm">
-      <div className="flex h-full max-h-[min(820px,100%)] w-full max-w-6xl flex-col rounded-lg border border-border bg-card shadow-2xl">
-        <div className="flex items-center gap-3 border-b border-border px-5 py-4">
-          <div className="min-w-0">
-            <h3 className="text-base font-semibold text-foreground">出口详情</h3>
-            <p className="text-xs text-muted-foreground">按节点 ID 合并展示完整 probe 结果。</p>
+    <Dialog open={open} onOpenChange={(nextOpen) => {
+      if (!nextOpen) onClose();
+    }}>
+      <DialogContent className="flex h-[min(820px,calc(100vh-4rem))] max-w-6xl flex-col gap-0 p-0">
+        <DialogHeader className="border-b border-border px-5 py-4 pr-14">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="min-w-0">
+              <DialogTitle>出口详情</DialogTitle>
+              <DialogDescription className="text-xs">按节点 ID 合并展示完整 probe 结果。</DialogDescription>
+            </div>
+            <div className="ml-auto flex shrink-0 items-center gap-1">
+              <Button
+                type="button"
+                variant={sortMode === "proxy-name" ? "default" : "outline"}
+                className="h-8 rounded-md px-2 text-xs"
+                title="按节点名称排序"
+                onClick={() => onSortModeChange("proxy-name")}
+              >
+                <ArrowDownAZ className="h-3.5 w-3.5" />
+                节点名称
+              </Button>
+              <Button
+                type="button"
+                variant={sortMode === "probe-latency" ? "default" : "outline"}
+                className="h-8 rounded-md px-2 text-xs"
+                title="按响应时间排序"
+                onClick={() => onSortModeChange("probe-latency")}
+              >
+                <Timer className="h-3.5 w-3.5" />
+                响应时间
+              </Button>
+            </div>
           </div>
-          <div className="ml-auto flex items-center gap-1">
-            <Button
-              type="button"
-              variant={sortMode === "proxy-name" ? "default" : "outline"}
-              className="h-8 rounded-md px-2 text-xs"
-              title="按节点名称排序"
-              onClick={() => onSortModeChange("proxy-name")}
-            >
-              <ArrowDownAZ className="h-3.5 w-3.5" />
-              节点名称
-            </Button>
-            <Button
-              type="button"
-              variant={sortMode === "probe-latency" ? "default" : "outline"}
-              className="h-8 rounded-md px-2 text-xs"
-              title="按响应时间排序"
-              onClick={() => onSortModeChange("probe-latency")}
-            >
-              <Timer className="h-3.5 w-3.5" />
-              响应时间
-            </Button>
-            <Button type="button" variant="outline" className="h-8 w-8 rounded-md p-0" title="关闭出口详情" onClick={onClose}>
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
+        </DialogHeader>
 
         <ScrollArea className="min-h-0 flex-1" viewportClassName="h-full" contentClassName="min-w-0">
           <div className="px-5 py-4">
             <ProbeTable rows={rows} />
           </div>
         </ScrollArea>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

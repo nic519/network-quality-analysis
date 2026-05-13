@@ -8,7 +8,16 @@ import { Input } from "./ui/input";
 import { ScrollArea } from "./ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { ProbeDetailsPanel } from "./probe-details-panel";
-import { ConfirmationDialog } from "./ui/confirmation-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "./ui/alert-dialog";
 import type { LatencyChartRow } from "../lib/chart-data";
 import { formatRunRegionLabels } from "../lib/run-region-label";
 import { cn } from "../lib/utils";
@@ -320,16 +329,32 @@ export function AnalysisView({
         onClose={() => setProbeDetailsOpen(false)}
       />
       {pendingDeleteRunLabel && onConfirmDeleteRun && onCancelDeleteRun ? (
-        <ConfirmationDialog
+        <AlertDialog
           open
-          title="确定删除这次历史测试？"
-          detail={pendingDeleteRunLabel}
-          description="删除后会从数据库移除对应结果。"
-          confirmLabel="确认删除"
-          cancelLabel="取消"
-          onConfirm={onConfirmDeleteRun}
-          onCancel={onCancelDeleteRun}
-        />
+          onOpenChange={(open) => {
+            if (!open) onCancelDeleteRun();
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>确定删除这次历史测试？</AlertDialogTitle>
+              <AlertDialogDescription className="break-all text-xs">{pendingDeleteRunLabel}</AlertDialogDescription>
+              <AlertDialogDescription>删除后会从数据库移除对应结果。</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={onCancelDeleteRun}>取消</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={(event) => {
+                  event.preventDefault();
+                  onConfirmDeleteRun();
+                }}
+              >
+                确认删除
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       ) : null}
     </section>
   );
