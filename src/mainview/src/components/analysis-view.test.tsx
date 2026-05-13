@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { AnalysisView, buildProbeRows, buildProbeSummary } from "./analysis-view";
+import { ProbeDetailsPanel } from "./probe-details-panel";
 import type { AppState } from "../../../shared/rpc";
 import { DEFAULT_PROBE_SETTINGS } from "../../../shared/probe-settings";
 import { DEFAULT_SITES, REGION_PRESETS, type ResultRow } from "../../../shared/domain";
@@ -61,23 +62,7 @@ describe("AnalysisView", () => {
       }),
     ];
 
-    const html = renderToStaticMarkup(
-      <AnalysisView
-        state={makeState(rows)}
-        selectedRunId="run-1"
-        onSelectedRunIdChange={() => {}}
-        fromDate="2026-05-13"
-        toDate="2026-05-13"
-        onFromDateChange={() => {}}
-        onToDateChange={() => {}}
-        search=""
-        onSearchChange={() => {}}
-        selectedSiteId="youtube"
-        onSelectedSiteIdChange={() => {}}
-        error={null}
-        onCopyResults={() => {}}
-      />,
-    );
+    const html = renderToStaticMarkup(<ProbeDetailsPanel open rows={buildProbeRows(rows, "")} sortMode="proxy-name" onSortModeChange={() => {}} onClose={() => {}} />);
 
     expect(html).toContain("203.0.113.88");
     expect(html).toContain("200 / 420ms");
@@ -85,34 +70,29 @@ describe("AnalysisView", () => {
 
   test("renders probe location and ASN content in grouped two-line blocks", () => {
     const html = renderToStaticMarkup(
-      <AnalysisView
-        state={makeState([
-          makeResult({
-            proxyId: "proxy-us-01",
-            proxyName: "US-01",
-            probeIp: "23.94.213.251",
-            probeStatus: "200",
-            probeLatency: "698ms",
-            probeCountryCode: "US",
-            probeCountry: "United States",
-            probeRegion: "California",
-            probeCity: "Los Angeles",
-            probeAsn: "AS36352",
-            probeOrg: "HostPapa",
-          }),
-        ])}
-        selectedRunId="run-1"
-        onSelectedRunIdChange={() => {}}
-        fromDate="2026-05-13"
-        toDate="2026-05-13"
-        onFromDateChange={() => {}}
-        onToDateChange={() => {}}
-        search=""
-        onSearchChange={() => {}}
-        selectedSiteId="youtube"
-        onSelectedSiteIdChange={() => {}}
-        error={null}
-        onCopyResults={() => {}}
+      <ProbeDetailsPanel
+        open
+        rows={buildProbeRows(
+          [
+            makeResult({
+              proxyId: "proxy-us-01",
+              proxyName: "US-01",
+              probeIp: "23.94.213.251",
+              probeStatus: "200",
+              probeLatency: "698ms",
+              probeCountryCode: "US",
+              probeCountry: "United States",
+              probeRegion: "California",
+              probeCity: "Los Angeles",
+              probeAsn: "AS36352",
+              probeOrg: "HostPapa",
+            }),
+          ],
+          "",
+        )}
+        sortMode="proxy-name"
+        onSortModeChange={() => {}}
+        onClose={() => {}}
       />,
     );
 
@@ -126,32 +106,27 @@ describe("AnalysisView", () => {
 
   test("renders probe location below the IP instead of using a separate location column", () => {
     const html = renderToStaticMarkup(
-      <AnalysisView
-        state={makeState([
-          makeResult({
-            proxyId: "proxy-us-01",
-            proxyName: "US-01",
-            probeIp: "23.94.213.251",
-            probeStatus: "200",
-            probeLatency: "698ms",
-            probeCountryCode: "US",
-            probeCountry: "United States",
-            probeRegion: "California",
-            probeCity: "Los Angeles",
-          }),
-        ])}
-        selectedRunId="run-1"
-        onSelectedRunIdChange={() => {}}
-        fromDate="2026-05-13"
-        toDate="2026-05-13"
-        onFromDateChange={() => {}}
-        onToDateChange={() => {}}
-        search=""
-        onSearchChange={() => {}}
-        selectedSiteId="youtube"
-        onSelectedSiteIdChange={() => {}}
-        error={null}
-        onCopyResults={() => {}}
+      <ProbeDetailsPanel
+        open
+        rows={buildProbeRows(
+          [
+            makeResult({
+              proxyId: "proxy-us-01",
+              proxyName: "US-01",
+              probeIp: "23.94.213.251",
+              probeStatus: "200",
+              probeLatency: "698ms",
+              probeCountryCode: "US",
+              probeCountry: "United States",
+              probeRegion: "California",
+              probeCity: "Los Angeles",
+            }),
+          ],
+          "",
+        )}
+        sortMode="proxy-name"
+        onSortModeChange={() => {}}
+        onClose={() => {}}
       />,
     );
 
@@ -190,8 +165,9 @@ describe("AnalysisView", () => {
       />,
     );
 
-    expect(html).toContain("HK-01");
-    expect(html).toContain("HK-13");
+    expect(html).toContain("查看出口详情");
+    expect(html).not.toContain(">ASN / 组织</th>");
+    expect(html).not.toContain(">Probe</th>");
   });
 
   test("sorts probe rows by response time with unavailable latencies last", () => {

@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { AlertCircle, ArrowDownAZ, Circle, CircleDot, Copy, Gauge, Globe2, Search, ShieldCheck, Timer, Trophy } from "lucide-react";
+import { AlertCircle, Circle, CircleDot, Copy, Gauge, Globe2, Search, ShieldCheck, Trophy } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { ScrollArea } from "./ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
+import { ProbeDetailsPanel } from "./probe-details-panel";
 import type { LatencyChartRow } from "../lib/chart-data";
 import { formatRunRegionLabels } from "../lib/run-region-label";
 import { cn } from "../lib/utils";
@@ -13,7 +14,24 @@ import { latencyToMs } from "../../../shared/domain";
 import type { SiteDefinition } from "../../../shared/domain";
 import type { AppState } from "../../../shared/rpc";
 
-type ProbeSortMode = "proxy-name" | "probe-latency";
+export type ProbeSortMode = "proxy-name" | "probe-latency";
+
+export type ProbeRow = {
+  key: string;
+  proxyName: string;
+  proxyType: string;
+  regionLabel: string;
+  probeIp: string;
+  probeCountry: string;
+  probeCountryCode: string;
+  probeRegion: string;
+  probeCity: string;
+  probeAsn: string;
+  probeOrg: string;
+  probeLatency: string;
+  probeStatus: string;
+  probeError: string;
+};
 
 export function AnalysisView({
   state,
@@ -45,6 +63,7 @@ export function AnalysisView({
   onCopyResults: () => void;
 }) {
   const [probeSortMode, setProbeSortMode] = useState<ProbeSortMode>("proxy-name");
+  const [isProbeDetailsOpen, setProbeDetailsOpen] = useState(false);
   const selectableSites = buildSelectableSites(state.sites, state.results);
   const selectedSite = selectableSites.find((site) => site.id === selectedSiteId) ?? selectableSites[0];
   const runItems = state.runs.slice(0, 12);
@@ -188,32 +207,20 @@ export function AnalysisView({
                     <div className="mb-3 flex items-center gap-2">
                       <Globe2 className="h-4 w-4 text-primary" />
                       <h2 className="text-sm font-semibold text-foreground">出口信息</h2>
-                      <span className="text-xs text-muted-foreground">按节点 ID 合并展示 probe 结果</span>
-                      <div className="ml-auto flex items-center gap-1">
+                      <span className="text-xs text-muted-foreground">完整节点列表收进二级详情面板。</span>
+                      <div className="ml-auto">
                         <Button
                           type="button"
-                          variant={probeSortMode === "proxy-name" ? "default" : "outline"}
+                          variant="outline"
                           className="h-7 rounded-md px-2 text-xs"
-                          title="按节点名称排序"
-                          onClick={() => setProbeSortMode("proxy-name")}
+                          title="查看出口详情"
+                          onClick={() => setProbeDetailsOpen(true)}
                         >
-                          <ArrowDownAZ className="h-3.5 w-3.5" />
-                          节点名称
-                        </Button>
-                        <Button
-                          type="button"
-                          variant={probeSortMode === "probe-latency" ? "default" : "outline"}
-                          className="h-7 rounded-md px-2 text-xs"
-                          title="按响应时间排序"
-                          onClick={() => setProbeSortMode("probe-latency")}
-                        >
-                          <Timer className="h-3.5 w-3.5" />
-                          响应时间
+                          查看出口详情
                         </Button>
                       </div>
                     </div>
                     <ProbeSummaryPanel summary={probeSummary} />
-                    {probeRows.length ? <ProbeTable rows={probeRows} /> : null}
                   </section>
                 ) : null}
               </div>
@@ -309,6 +316,13 @@ export function AnalysisView({
           </div>
         </div>
       </div>
+      <ProbeDetailsPanel
+        open={isProbeDetailsOpen}
+        rows={probeRows}
+        sortMode={probeSortMode}
+        onSortModeChange={setProbeSortMode}
+        onClose={() => setProbeDetailsOpen(false)}
+      />
     </section>
   );
 }
@@ -394,72 +408,6 @@ function SupplierSummaryTable({ rows }: { rows: ReturnType<typeof buildProbeSumm
           ))}
         </TableBody>
       </Table>
-    </div>
-  );
-}
-
-function ProbeTable({ rows }: { rows: ReturnType<typeof buildProbeRows> }) {
-  return (
-    <div className="rounded-md border border-border bg-card/45">
-      <Table>
-        <TableHeader className="[&_tr]:border-border">
-          <TableRow className="hover:bg-transparent">
-            <TableHead className="h-9 px-3 text-xs text-muted-foreground">节点</TableHead>
-            <TableHead className="h-9 px-3 text-xs text-muted-foreground">出口 IP</TableHead>
-            <TableHead className="h-9 px-3 text-xs text-muted-foreground">ASN / 组织</TableHead>
-            <TableHead className="h-9 px-3 text-xs text-muted-foreground">Probe</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody className="[&_tr:last-child]:border-0">
-          {rows.map((row) => (
-            <TableRow key={row.key} className="border-border hover:bg-accent/35">
-              <TableCell className="max-w-[260px] px-3 py-2">
-                <div className="truncate text-sm font-medium text-foreground" title={row.proxyName}>
-                  {row.proxyName}
-                </div>
-                <div className="mt-0.5 text-xs leading-4 text-muted-foreground">{row.proxyType} / {row.regionLabel}</div>
-              </TableCell>
-              <TableCell className="px-3 py-2">
-                <ProbeIpCell row={row} />
-              </TableCell>
-              <TableCell className="max-w-[260px] px-3 py-2">
-                <ProbeAsnCell row={row} />
-              </TableCell>
-              <TableCell className="px-3 py-2 text-xs leading-4 text-muted-foreground">
-                {row.probeStatus ? `${row.probeStatus} / ${row.probeLatency || "N/A"}` : row.probeError || "N/A"}
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
-  );
-}
-
-function ProbeIpCell({ row }: { row: ReturnType<typeof buildProbeRows>[number] }) {
-  const [locationLine1, locationLine2] = formatProbeLocationLines(row);
-
-  return (
-    <div title={[row.probeIp, formatProbeLocationTitle(row)].filter(Boolean).join(" / ") || "N/A"}>
-      <div className="break-all text-sm leading-5 text-foreground">{row.probeIp || "N/A"}</div>
-      {locationLine1 ? <div className="mt-0.5 text-xs leading-4 text-muted-foreground">{locationLine1}</div> : null}
-      {locationLine2 ? <div className="text-xs leading-4 text-muted-foreground">{locationLine2}</div> : null}
-    </div>
-  );
-}
-
-function ProbeAsnCell({ row }: { row: ReturnType<typeof buildProbeRows>[number] }) {
-  const hasAsn = Boolean(row.probeAsn);
-  const hasOrg = Boolean(row.probeOrg);
-
-  if (!hasAsn && !hasOrg) {
-    return <div className="text-sm leading-5 text-foreground">N/A</div>;
-  }
-
-  return (
-    <div title={row.probeOrg || row.probeAsn || "N/A"}>
-      {hasAsn ? <div className="truncate text-sm leading-5 text-foreground">{row.probeAsn}</div> : null}
-      {hasOrg ? <div className="truncate text-xs leading-4 text-muted-foreground">{row.probeOrg}</div> : null}
     </div>
   );
 }
@@ -604,7 +552,9 @@ function summarizeProxyRows(rows: ProxyProbeAccumulator[]): ProbeSummaryRow {
 function extractSupplierPrefix(proxyName: string) {
   const separatorIndex = proxyName.indexOf("-");
   if (separatorIndex <= 0) return "";
-  return proxyName.slice(0, separatorIndex).trim();
+  const prefix = proxyName.slice(0, separatorIndex).trim();
+  if (!prefix) return "";
+  return /[^A-Za-z0-9]/.test(prefix) ? prefix : "";
 }
 
 function hasProbeEvidence(row: ReturnType<typeof makeProbeRow>) {
@@ -613,22 +563,7 @@ function hasProbeEvidence(row: ReturnType<typeof makeProbeRow>) {
 
 export function buildProbeRows(results: AppState["results"], search: string, sortMode: ProbeSortMode = "proxy-name") {
   const normalizedSearch = search.trim().toLowerCase();
-  const rows = new Map<string, {
-    key: string;
-    proxyName: string;
-    proxyType: string;
-    regionLabel: string;
-    probeIp: string;
-    probeCountry: string;
-    probeCountryCode: string;
-    probeRegion: string;
-    probeCity: string;
-    probeAsn: string;
-    probeOrg: string;
-    probeLatency: string;
-    probeStatus: string;
-    probeError: string;
-  }>();
+  const rows = new Map<string, ProbeRow>();
 
   for (const result of results) {
     if (normalizedSearch && !result.proxyName.toLowerCase().includes(normalizedSearch)) continue;
@@ -642,7 +577,7 @@ export function buildProbeRows(results: AppState["results"], search: string, sor
   return [...rows.values()].sort((a, b) => compareProbeRows(a, b, sortMode));
 }
 
-function makeProbeRow(result: AppState["results"][number]) {
+function makeProbeRow(result: AppState["results"][number]): ProbeRow {
   return {
     key: result.proxyId,
     proxyName: result.proxyName,
@@ -682,17 +617,6 @@ function compareProbeRows(left: ReturnType<typeof makeProbeRow>, right: ReturnTy
   }
 
   return left.proxyName.localeCompare(right.proxyName, "zh-CN");
-}
-
-function formatProbeLocationLines(row: ReturnType<typeof buildProbeRows>[number]) {
-  const line1 = [row.probeCountryCode, row.probeCountry].filter(Boolean).join(" / ");
-  const line2 = [row.probeRegion, row.probeCity].filter(Boolean).join(" / ");
-  return [line1, line2] as const;
-}
-
-function formatProbeLocationTitle(row: ReturnType<typeof buildProbeRows>[number]) {
-  const [line1, line2] = formatProbeLocationLines(row);
-  return [line1, line2].filter(Boolean).join(" / ") || "N/A";
 }
 
 function buildRunScopedChartRows(
