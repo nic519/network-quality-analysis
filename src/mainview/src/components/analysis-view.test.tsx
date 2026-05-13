@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { AnalysisView, buildProbeRows } from "./analysis-view";
+import { AnalysisView, buildProbeRows, buildProbeSummary } from "./analysis-view";
 import type { AppState } from "../../../shared/rpc";
 import { DEFAULT_PROBE_SETTINGS } from "../../../shared/probe-settings";
 import { DEFAULT_SITES, REGION_PRESETS, type ResultRow } from "../../../shared/domain";
@@ -210,6 +210,52 @@ describe("AnalysisView", () => {
     );
 
     expect(rows.map((row) => row.proxyName)).toEqual(["HK Success", "IPv6 Failed"]);
+  });
+
+  test("summarizes effective nodes and unique probe IPs from grouped results", () => {
+    const rows = [
+      makeResult({ proxyId: "rice-01", proxyName: "🍚-🇹🇼 [Any]TW 01", latency: "400ms", probeIp: "118.167.221.153" }),
+      makeResult({ proxyId: "rice-02", proxyName: "🍚-🇹🇼 [三网]TW 02", latency: "665ms", probeIp: "118.167.221.153" }),
+      makeResult({ proxyId: "bird-01", proxyName: "🐦-hy2台湾01", latency: "359ms", probeIp: "36.231.118.136" }),
+      makeResult({ proxyId: "bird-03", proxyName: "🐦-hy2台湾03", latency: "669ms", probeIp: "111.249.72.199" }),
+      makeResult({ proxyId: "bird-04", proxyName: "🐦-hy2台湾04", latency: "379ms", probeIp: "36.231.97.220" }),
+      makeResult({ proxyId: "bird-05", proxyName: "🐦-hy2台湾05", latency: "N/A", probeError: "timeout" }),
+      makeResult({ proxyId: "bird-07", proxyName: "🐦-hy2台湾07", latency: "144ms", probeIp: "111.250.118.214" }),
+      makeResult({ proxyId: "bird-trojan-03", proxyName: "🐦-trojan台湾03", latency: "N/A", probeError: "connect refused" }),
+      makeResult({ proxyId: "bird-vless-01", proxyName: "🐦-vless台湾01", latency: "133ms", probeError: "context deadline exceeded" }),
+      makeResult({ proxyId: "bird-vless-02", proxyName: "🐦-vless台湾02", latency: "N/A", probeError: "context deadline exceeded" }),
+      makeResult({ proxyId: "bird-vless-03", proxyName: "🐦-vless台湾03", latency: "956ms", probeIp: "36.231.105.13" }),
+      makeResult({ proxyId: "heart-01", proxyName: "💗-🇨🇳台湾专线01|BGP|流媒体", latency: "653ms", probeIp: "2406:da1c:80f6:b00:ac4b:319d:d098:bc83" }),
+      makeResult({ proxyId: "heart-02", proxyName: "💗-🇨🇳台湾高速01|BGP|流媒体", latency: "368ms", probeIp: "2406:da1c:80f6:b00:ac4b:319d:d098:bc83" }),
+    ];
+
+    const summary = buildProbeSummary(rows, "");
+
+    expect(summary.totalNodes).toBe(13);
+    expect(summary.effectiveNodes).toBe(10);
+    expect(summary.effectiveNodesWithIp).toBe(9);
+    expect(summary.uniqueEffectiveIps).toBe(7);
+    expect(summary.effectiveNodesMissingIp).toBe(1);
+  });
+
+  test("groups probe summary by supplier prefix when proxy names use prefix separators", () => {
+    const summary = buildProbeSummary(
+      [
+        makeResult({ proxyId: "rice-01", proxyName: "🍚-🇹🇼 [Any]TW 01", latency: "400ms", probeIp: "118.167.221.153" }),
+        makeResult({ proxyId: "rice-02", proxyName: "🍚-🇹🇼 [三网]TW 02", latency: "665ms", probeIp: "118.167.221.153" }),
+        makeResult({ proxyId: "bird-01", proxyName: "🐦-hy2台湾01", latency: "359ms", probeIp: "36.231.118.136" }),
+        makeResult({ proxyId: "bird-vless-01", proxyName: "🐦-vless台湾01", latency: "133ms", probeError: "context deadline exceeded" }),
+        makeResult({ proxyId: "heart-01", proxyName: "💗-🇨🇳台湾专线01|BGP|流媒体", latency: "653ms", probeIp: "2406:da1c:80f6:b00:ac4b:319d:d098:bc83" }),
+        makeResult({ proxyId: "heart-02", proxyName: "💗-🇨🇳台湾高速01|BGP|流媒体", latency: "368ms", probeIp: "2406:da1c:80f6:b00:ac4b:319d:d098:bc83" }),
+      ],
+      "",
+    );
+
+    expect(summary.supplierRows).toEqual([
+      expect.objectContaining({ supplier: "🍚", totalNodes: 2, effectiveNodes: 2, uniqueEffectiveIps: 1 }),
+      expect.objectContaining({ supplier: "🐦", totalNodes: 2, effectiveNodes: 2, uniqueEffectiveIps: 1, effectiveNodesMissingIp: 1 }),
+      expect.objectContaining({ supplier: "💗", totalNodes: 2, effectiveNodes: 2, uniqueEffectiveIps: 1 }),
+    ]);
   });
 });
 

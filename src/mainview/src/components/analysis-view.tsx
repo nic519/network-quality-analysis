@@ -53,6 +53,7 @@ export function AnalysisView({
   const availableChartRows = chartRows.filter((row) => row.isAvailable);
   const failedSiteRows = buildFailedSiteRows(scopedResults, search);
   const probeRows = buildProbeRows(scopedResults, search, probeSortMode);
+  const probeSummary = buildProbeSummary(scopedResults, search);
   const fastestRow = availableChartRows[0];
 
   return (
@@ -182,7 +183,7 @@ export function AnalysisView({
                     detail={failedSiteRows.length ? "下方失败记录可查看网站" : "当前范围没有失败记录"}
                   />
                 </div>
-                {probeRows.length ? (
+                {probeRows.length || probeSummary.totalNodes ? (
                   <section className="mb-5">
                     <div className="mb-3 flex items-center gap-2">
                       <Globe2 className="h-4 w-4 text-primary" />
@@ -211,7 +212,8 @@ export function AnalysisView({
                         </Button>
                       </div>
                     </div>
-                    <ProbeTable rows={probeRows} />
+                    <ProbeSummaryPanel summary={probeSummary} />
+                    {probeRows.length ? <ProbeTable rows={probeRows} /> : null}
                   </section>
                 ) : null}
               </div>
@@ -338,6 +340,61 @@ function SummaryTile({
   );
 }
 
+function ProbeSummaryPanel({ summary }: { summary: ReturnType<typeof buildProbeSummary> }) {
+  return (
+    <div className="mb-3 space-y-3">
+      <div className="grid gap-2 sm:grid-cols-3">
+        <SummaryTile
+          icon={ShieldCheck}
+          label="有效节点"
+          value={`${summary.effectiveNodes}/${summary.totalNodes}`}
+          detail="延迟可解析的节点数"
+        />
+        <SummaryTile
+          icon={Globe2}
+          label="独立出口 IP"
+          value={`${summary.uniqueEffectiveIps}`}
+          detail={`${summary.effectiveNodesWithIp} 个有效节点有 IP`}
+        />
+        <SummaryTile
+          icon={AlertCircle}
+          label="有效但无 IP"
+          value={`${summary.effectiveNodesMissingIp}`}
+          detail={summary.effectiveNodesMissingIp ? "Probe 未拿到出口 IP" : "有效节点均有出口 IP"}
+        />
+      </div>
+      {summary.supplierRows.length > 1 ? <SupplierSummaryTable rows={summary.supplierRows} /> : null}
+    </div>
+  );
+}
+
+function SupplierSummaryTable({ rows }: { rows: ReturnType<typeof buildProbeSummary>["supplierRows"] }) {
+  return (
+    <div className="rounded-md border border-border bg-card/45">
+      <Table>
+        <TableHeader className="[&_tr]:border-border">
+          <TableRow className="hover:bg-transparent">
+            <TableHead className="h-8 px-3 text-xs text-muted-foreground">供应商前缀</TableHead>
+            <TableHead className="h-8 px-3 text-xs text-muted-foreground">有效 / 总节点</TableHead>
+            <TableHead className="h-8 px-3 text-xs text-muted-foreground">独立出口 IP</TableHead>
+            <TableHead className="h-8 px-3 text-xs text-muted-foreground">有效但无 IP</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody className="[&_tr:last-child]:border-0">
+          {rows.map((row) => (
+            <TableRow key={row.supplier} className="border-border hover:bg-accent/35">
+              <TableCell className="px-3 py-2 text-sm font-medium text-foreground">{row.supplier}</TableCell>
+              <TableCell className="px-3 py-2 text-sm text-foreground">{row.effectiveNodes}/{row.totalNodes}</TableCell>
+              <TableCell className="px-3 py-2 text-sm text-foreground">{row.uniqueEffectiveIps}</TableCell>
+              <TableCell className="px-3 py-2 text-sm text-muted-foreground">{row.effectiveNodesMissingIp}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
 function ProbeTable({ rows }: { rows: ReturnType<typeof buildProbeRows> }) {
   return (
     <div className="rounded-md border border-border bg-card/45">
@@ -446,6 +503,110 @@ function FailureTable({ rows }: { rows: ReturnType<typeof buildFailedSiteRows> }
       </Table>
     </div>
   );
+}
+
+type ProbeSummaryRow = {
+  totalNodes: number;
+  effectiveNodes: number;
+  effectiveNodesWithIp: number;
+  uniqueEffectiveIps: number;
+  effectiveNodesMissingIp: number;
+};
+
+type ProbeSummary = ProbeSummaryRow & {
+  supplierRows: Array<ProbeSummaryRow & { supplier: string }>;
+};
+
+type ProxyProbeAccumulator = {
+  proxyName: string;
+  isEffective: boolean;
+  bestProbeRow: ReturnType<typeof makeProbeRow> | null;
+};
+
+export function buildProbeSummary(results: AppState["results"], search: string): ProbeSummary {
+  const normalizedSearch = search.trim().toLowerCase();
+  const proxies = new Map<string, ProxyProbeAccumulator>();
+
+  for (const result of results) {
+    if (normalizedSearch && !result.proxyName.toLowerCase().includes(normalizedSearch)) continue;
+
+    const key = result.proxyId;
+    const existing = proxies.get(key);
+    const nextProbeRow = makeProbeRow(result);
+    const isEffective = latencyToMs(result.latency) !== null;
+
+    if (!existing) {
+      proxies.set(key, {
+        proxyName: result.proxyName,
+        isEffective,
+        bestProbeRow: hasProbeEvidence(nextProbeRow) ? nextProbeRow : null,
+      });
+      continue;
+    }
+
+    existing.isEffective = existing.isEffective || isEffective;
+    if (!existing.bestProbeRow || probeResultScore(nextProbeRow) > probeResultScore(existing.bestProbeRow)) {
+      existing.bestProbeRow = hasProbeEvidence(nextProbeRow) ? nextProbeRow : existing.bestProbeRow;
+    }
+  }
+
+  const proxyRows = [...proxies.values()];
+  const summary = summarizeProxyRows(proxyRows);
+  const suppliers = new Map<string, ProxyProbeAccumulator[]>();
+
+  for (const proxy of proxyRows) {
+    const supplier = extractSupplierPrefix(proxy.proxyName);
+    if (!supplier) continue;
+    const rows = suppliers.get(supplier) ?? [];
+    rows.push(proxy);
+    suppliers.set(supplier, rows);
+  }
+
+  return {
+    ...summary,
+    supplierRows: [...suppliers.entries()]
+      .map(([supplier, rows]) => ({ supplier, ...summarizeProxyRows(rows) }))
+      .sort((left, right) => left.supplier.localeCompare(right.supplier, "zh-CN")),
+  };
+}
+
+function summarizeProxyRows(rows: ProxyProbeAccumulator[]): ProbeSummaryRow {
+  const effectiveIps = new Set<string>();
+  let effectiveNodes = 0;
+  let effectiveNodesWithIp = 0;
+  let effectiveNodesMissingIp = 0;
+
+  for (const row of rows) {
+    if (!row.isEffective) continue;
+    effectiveNodes += 1;
+
+    const probeIp = row.bestProbeRow?.probeIp.trim() ?? "";
+    if (!probeIp) {
+      effectiveNodesMissingIp += 1;
+      continue;
+    }
+
+    effectiveNodesWithIp += 1;
+    effectiveIps.add(probeIp);
+  }
+
+  return {
+    totalNodes: rows.length,
+    effectiveNodes,
+    effectiveNodesWithIp,
+    uniqueEffectiveIps: effectiveIps.size,
+    effectiveNodesMissingIp,
+  };
+}
+
+function extractSupplierPrefix(proxyName: string) {
+  const separatorIndex = proxyName.indexOf("-");
+  if (separatorIndex <= 0) return "";
+  return proxyName.slice(0, separatorIndex).trim();
+}
+
+function hasProbeEvidence(row: ReturnType<typeof makeProbeRow>) {
+  return Boolean(row.probeIp || row.probeStatus || row.probeError);
 }
 
 export function buildProbeRows(results: AppState["results"], search: string, sortMode: ProbeSortMode = "proxy-name") {
