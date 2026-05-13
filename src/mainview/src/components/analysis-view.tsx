@@ -3,7 +3,6 @@ import { AlertCircle, ArrowDownAZ, Circle, CircleDot, Copy, Gauge, Globe2, Searc
 import { Bar, BarChart, CartesianGrid, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
-import { CountryFlag, getRegionFlagCode } from "./country-flag";
 import { Input } from "./ui/input";
 import { ScrollArea } from "./ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
@@ -11,7 +10,7 @@ import type { LatencyChartRow } from "../lib/chart-data";
 import { formatRunRegionLabels } from "../lib/run-region-label";
 import { cn } from "../lib/utils";
 import { latencyToMs } from "../../../shared/domain";
-import type { RegionPreset, SiteDefinition } from "../../../shared/domain";
+import type { SiteDefinition } from "../../../shared/domain";
 import type { AppState } from "../../../shared/rpc";
 
 type ProbeSortMode = "proxy-name" | "probe-latency";
@@ -359,11 +358,7 @@ function ProbeTable({ rows }: { rows: ReturnType<typeof buildProbeRows> }) {
                 <div className="truncate text-sm font-medium text-foreground" title={row.proxyName}>
                   {row.proxyName}
                 </div>
-                <div className="mt-0.5 flex items-center gap-1.5 text-xs leading-4 text-muted-foreground">
-                  <span>{row.proxyType} /</span>
-                  <CountryFlag code={getRegionFlagCode(row.regionId)} label={row.regionLabel} markerName="data-region-flag" />
-                  <span>{row.regionLabel}</span>
-                </div>
+                <div className="mt-0.5 text-xs leading-4 text-muted-foreground">{row.proxyType} / {row.regionLabel}</div>
               </TableCell>
               <TableCell className="px-3 py-2 text-sm text-foreground">
                 <div className="break-all leading-5">{row.probeIp || "N/A"}</div>
@@ -394,12 +389,7 @@ function ProbeLocationCell({ row }: { row: ReturnType<typeof buildProbeRows>[num
 
   return (
     <div title={formatProbeLocationTitle(row)}>
-      {line1 ? (
-        <div className="flex items-center gap-1.5 text-sm leading-5 text-muted-foreground">
-          <CountryFlag code={row.probeCountryCode} label={row.probeCountry || row.probeCountryCode || "国家"} markerName="data-country-flag" />
-          <span>{line1}</span>
-        </div>
-      ) : null}
+      {line1 ? <div className="text-sm leading-5 text-muted-foreground">{line1}</div> : null}
       {line2 ? <div className="text-xs leading-4 text-muted-foreground">{line2}</div> : null}
     </div>
   );
@@ -438,11 +428,7 @@ function FailureTable({ rows }: { rows: ReturnType<typeof buildFailedSiteRows> }
                 <div className="truncate text-sm text-foreground">
                   <span className="font-medium">{row.proxyName}</span>
                   <span className="mx-2 text-muted-foreground">·</span>
-                  <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <span>{row.proxyType} /</span>
-                    <CountryFlag code={getRegionFlagCode(row.regionId)} label={row.regionLabel} markerName="data-region-flag" />
-                    <span>{row.regionLabel}</span>
-                  </span>
+                  <span className="text-xs text-muted-foreground">{row.proxyType} / {row.regionLabel}</span>
                 </div>
               </TableCell>
               <TableCell className="px-3 py-2.5">
@@ -468,7 +454,6 @@ export function buildProbeRows(results: AppState["results"], search: string, sor
     key: string;
     proxyName: string;
     proxyType: string;
-    regionId: RegionPreset["id"];
     regionLabel: string;
     probeIp: string;
     probeCountry: string;
@@ -499,7 +484,6 @@ function makeProbeRow(result: AppState["results"][number]) {
     key: result.proxyId,
     proxyName: result.proxyName,
     proxyType: result.proxyType,
-    regionId: result.regionId,
     regionLabel: result.regionLabel,
     probeIp: result.probeIp ?? "",
     probeCountry: result.probeCountry ?? "",
@@ -623,7 +607,6 @@ function buildFailedSiteRows(results: AppState["results"], search: string) {
       key: string;
       proxyName: string;
       proxyType: string;
-      regionId: RegionPreset["id"];
       regionLabel: string;
       failedSites: string[];
     }
@@ -640,7 +623,6 @@ function buildFailedSiteRows(results: AppState["results"], search: string) {
         key,
         proxyName: result.proxyName,
         proxyType: result.proxyType,
-        regionId: result.regionId,
         regionLabel: result.regionLabel,
         failedSites: [result.siteName],
       });
