@@ -129,6 +129,9 @@ const rpc = BrowserView.defineRPC<AppRPC>({
               onProgress: (message) => {
                 window.webview.rpc?.send.progress({ message });
               },
+              onStructuredProgress: (progress) => {
+                window.webview.rpc?.send.runProgress(progress);
+              },
             },
           );
 

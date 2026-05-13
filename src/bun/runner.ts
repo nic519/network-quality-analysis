@@ -12,8 +12,10 @@ import {
   type SiteDefinition,
 } from "../shared/domain";
 import { DEFAULT_PROBE_SETTINGS, normalizeProbeSettings, type ProbeSettings } from "../shared/probe-settings";
+import type { RunProgressState } from "../shared/rpc";
 
 const DEFAULT_PROXY_CONCURRENT = "2";
+const DEFAULT_NODE_COUNT_ESTIMATE = 4;
 
 export type RunRequest = {
   configPath: string;
@@ -27,6 +29,7 @@ export type RunnerOptions = {
   now?: () => Date;
   execute?: (binaryPath: string, args: string[], options?: ExecuteSpeedtestOptions) => Promise<string>;
   onProgress?: (message: string) => void;
+  onStructuredProgress?: (progress: RunProgressState) => void;
   probeSettings?: ProbeSettings;
 };
 
@@ -98,9 +101,48 @@ export async function runLatencyTest(request: RunRequest, options: RunnerOptions
     throw new Error("请至少启用一个测试网站");
   }
   const selectedRegions = REGION_PRESETS.filter((region) => request.regionIds.includes(region.id));
+  const totalGroups = selectedRegions.length * sites.length;
   const runs: RunRecord[] = [];
   const results: ResultRow[] = [];
+  const regionNodeCountHints = new Map<RegionPreset["id"], number>();
   let activeRun: RunRecord | null = null;
+  let completedGroups = 0;
+  let completedNodeUnits = 0;
+  let activeGroup: { region: RegionPreset; site: SiteDefinition } | null = null;
+  let activeGroupNodeIndex = 0;
+  let activeGroupEstimatedNodeCount = 0;
+
+  const emitTextProgress = (message: string) => {
+    options.onProgress?.(message);
+
+    if (!activeGroup) return;
+
+    const nextNodeIndex = extractNodeSequenceFromProgressLine(message);
+    if (nextNodeIndex === null || nextNodeIndex <= activeGroupNodeIndex) return;
+
+    activeGroupNodeIndex = nextNodeIndex;
+    activeGroupEstimatedNodeCount = estimateNodeCount(activeGroupNodeIndex, regionNodeCountHints.get(activeGroup.region.id) ?? null, [
+      ...regionNodeCountHints.values(),
+    ]);
+    publishStructuredProgress(options, {
+      stage: "running",
+      completedGroups,
+      totalGroups,
+      percent: calculateNodeWeightedProgressPercent({
+        completedNodeUnits,
+        activeGroupNodeIndex,
+        activeGroupEstimatedNodeCount,
+        pendingGroupsCount: totalGroups - completedGroups - 1,
+        knownNodeCountHints: [...regionNodeCountHints.values()],
+      }),
+      region: activeGroup.region,
+      site: activeGroup.site,
+      currentNodeIndex: activeGroupNodeIndex,
+      estimatedNodeCount: activeGroupEstimatedNodeCount,
+      nodeCount: null,
+      message: `正在测试 ${activeGroup.region.label} -> ${activeGroup.site.name}，第 ${activeGroupNodeIndex} 个节点`,
+    });
+  };
 
   try {
     for (const region of selectedRegions) {
@@ -109,14 +151,44 @@ export async function runLatencyTest(request: RunRequest, options: RunnerOptions
       let includeProbeForRegion = normalizeProbeSettings(options.probeSettings).enabled;
 
       for (const site of sites) {
-        options.onProgress?.(`测试 ${region.label} -> ${site.name}`);
+        activeGroup = { region, site };
+        activeGroupNodeIndex = 0;
+        activeGroupEstimatedNodeCount = estimateNodeCount(0, regionNodeCountHints.get(region.id) ?? null, [...regionNodeCountHints.values()]);
+        publishStructuredProgress(options, {
+          stage: "running",
+          completedGroups,
+          totalGroups,
+          percent: calculateNodeWeightedProgressPercent({
+            completedNodeUnits,
+            activeGroupNodeIndex,
+            activeGroupEstimatedNodeCount,
+            pendingGroupsCount: totalGroups - completedGroups - 1,
+            knownNodeCountHints: [...regionNodeCountHints.values()],
+          }),
+          region,
+          site,
+          currentNodeIndex: activeGroupNodeIndex,
+          estimatedNodeCount: activeGroupEstimatedNodeCount,
+          nodeCount: null,
+          message: `正在测试 ${region.label} -> ${site.name} (${completedGroups + 1}/${totalGroups})`,
+        });
+        emitTextProgress(`测试 ${region.label} -> ${site.name}`);
         const args = buildSpeedtestArgs(configPath, region, site, options.probeSettings, {
           includeProbe: includeProbeForRegion,
         });
-        options.onProgress?.(`运行 ${formatSpeedtestCommand(args)}`);
-        const raw = await executeWithOptionalFlagFallback(binaryPath, args, execute, options);
+        emitTextProgress(`运行 ${formatSpeedtestCommand(args)}`);
+        const raw = await executeWithOptionalFlagFallback(binaryPath, args, execute, {
+          ...options,
+          onProgress: emitTextProgress,
+        });
         const rows = normalizeSpeedtestRows(raw, activeRun.id, region, site);
         results.push(...rows);
+        regionNodeCountHints.set(region.id, rows.length);
+        completedNodeUnits += rows.length;
+        activeGroupNodeIndex = rows.length;
+        activeGroupEstimatedNodeCount = rows.length;
+        completedGroups += 1;
+        activeGroup = null;
         includeProbeForRegion = false;
       }
 
@@ -124,6 +196,18 @@ export async function runLatencyTest(request: RunRequest, options: RunnerOptions
       activeRun.completedAt = now().toISOString();
     }
 
+    publishStructuredProgress(options, {
+      stage: "completed",
+      completedGroups,
+      totalGroups,
+      percent: 100,
+      region: null,
+      site: null,
+      currentNodeIndex: null,
+      estimatedNodeCount: null,
+      nodeCount: null,
+      message: totalGroups ? `测试完成 (${completedGroups}/${totalGroups})` : "测试完成",
+    });
     const run = runs[0] ?? createEmptyRun(now(), request.regionIds);
     return { run, runs, results };
   } catch (error) {
@@ -132,9 +216,101 @@ export async function runLatencyTest(request: RunRequest, options: RunnerOptions
       activeRun.completedAt = now().toISOString();
       activeRun.errorMessage = error instanceof Error ? error.message : String(error);
     }
+    publishStructuredProgress(options, {
+      stage: "failed",
+      completedGroups,
+      totalGroups,
+      percent: calculateNodeWeightedProgressPercent({
+        completedNodeUnits,
+        activeGroupNodeIndex,
+        activeGroupEstimatedNodeCount,
+        pendingGroupsCount: Math.max(0, totalGroups - completedGroups - (activeGroup ? 1 : 0)),
+        knownNodeCountHints: [...regionNodeCountHints.values()],
+      }),
+      region: activeGroup?.region ?? null,
+      site: activeGroup?.site ?? null,
+      currentNodeIndex: activeGroup ? activeGroupNodeIndex : null,
+      estimatedNodeCount: activeGroup ? activeGroupEstimatedNodeCount : null,
+      nodeCount: null,
+      message: `测试失败：${error instanceof Error ? error.message : String(error)}`,
+    });
     const run = activeRun ?? runs[0] ?? createEmptyRun(now(), request.regionIds);
     throw Object.assign(error instanceof Error ? error : new Error(String(error)), { run, runs, results });
   }
+}
+
+function publishStructuredProgress(
+  options: RunnerOptions,
+  details: {
+    stage: RunProgressState["stage"];
+    completedGroups: number;
+    totalGroups: number;
+    percent: number;
+    region: RegionPreset | null;
+    site: SiteDefinition | null;
+    currentNodeIndex: number | null;
+    estimatedNodeCount: number | null;
+    nodeCount: number | null;
+    message: string;
+  },
+) {
+  options.onStructuredProgress?.({
+    stage: details.stage,
+    completedGroups: details.completedGroups,
+    totalGroups: details.totalGroups,
+    percent: details.percent,
+    currentGroupNodeIndex: details.currentNodeIndex,
+    currentGroupEstimatedNodeCount: details.estimatedNodeCount,
+    currentRegionId: details.region?.id ?? null,
+    currentRegionLabel: details.region?.label ?? null,
+    currentSiteId: details.site?.id ?? null,
+    currentSiteName: details.site?.name ?? null,
+    currentSiteUrl: details.site?.url ?? null,
+    currentGroupLabel: details.region && details.site ? `${details.region.label} -> ${details.site.name}` : null,
+    currentGroupNodeCount: details.nodeCount,
+    message: details.message,
+  });
+}
+
+function calculateNodeWeightedProgressPercent({
+  completedNodeUnits,
+  activeGroupNodeIndex,
+  activeGroupEstimatedNodeCount,
+  pendingGroupsCount,
+  knownNodeCountHints,
+}: {
+  completedNodeUnits: number;
+  activeGroupNodeIndex: number;
+  activeGroupEstimatedNodeCount: number;
+  pendingGroupsCount: number;
+  knownNodeCountHints: number[];
+}) {
+  const fallbackNodeCount = averageNodeCount(knownNodeCountHints) || activeGroupEstimatedNodeCount || DEFAULT_NODE_COUNT_ESTIMATE;
+  const activeNodeBudget = activeGroupEstimatedNodeCount || 0;
+  const totalEstimatedNodeUnits = completedNodeUnits + activeNodeBudget + Math.max(0, pendingGroupsCount) * fallbackNodeCount;
+  if (totalEstimatedNodeUnits <= 0) return 0;
+  const progressedNodeUnits = completedNodeUnits + Math.min(activeGroupNodeIndex, activeNodeBudget || activeGroupNodeIndex);
+  return Math.max(0, Math.min(100, Math.round((progressedNodeUnits / totalEstimatedNodeUnits) * 100)));
+}
+
+function averageNodeCount(values: number[]) {
+  if (!values.length) return null;
+  return Math.max(1, Math.round(values.reduce((sum, value) => sum + value, 0) / values.length));
+}
+
+function estimateNodeCount(currentNodeIndex: number, knownRegionNodeCount: number | null, knownNodeHints: number[]) {
+  if (knownRegionNodeCount && knownRegionNodeCount > 0) return knownRegionNodeCount;
+  const averageKnownNodeCount = averageNodeCount(knownNodeHints);
+  if (averageKnownNodeCount) return Math.max(currentNodeIndex + 1, averageKnownNodeCount);
+  return Math.max(DEFAULT_NODE_COUNT_ESTIMATE, currentNodeIndex + 1);
+}
+
+function extractNodeSequenceFromProgressLine(message: string) {
+  const trimmed = message.replace(/^\[clash-speedtest\]\s*/, "").trim();
+  const match = trimmed.match(/^(\d+)\.\s/);
+  if (!match) return null;
+  const sequence = Number(match[1]);
+  return Number.isFinite(sequence) ? sequence : null;
 }
 
 async function executeWithOptionalFlagFallback(

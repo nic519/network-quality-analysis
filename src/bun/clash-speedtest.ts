@@ -5,7 +5,7 @@ import packageJson from "../../package.json";
 import type { ClashSpeedtestState } from "../shared/rpc";
 
 const GO_INSTALL_COMMAND = "go install github.com/nic519/clash-speedtest@latest";
-export const MINIMUM_CLASH_SPEEDTEST_VERSION = packageJson.version;
+export const MINIMUM_CLASH_SPEEDTEST_VERSION = "1.9.0";
 
 export type ResolveClashSpeedtestOptions = {
   platform?: NodeJS.Platform;

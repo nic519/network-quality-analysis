@@ -39,6 +39,23 @@ export type ClashSpeedtestState = {
   checkedAt: string;
 };
 
+export type RunProgressState = {
+  stage: "running" | "completed" | "failed";
+  completedGroups: number;
+  totalGroups: number;
+  percent: number;
+  currentGroupNodeIndex: number | null;
+  currentGroupEstimatedNodeCount: number | null;
+  currentRegionId: string | null;
+  currentRegionLabel: string | null;
+  currentSiteId: string | null;
+  currentSiteName: string | null;
+  currentSiteUrl: string | null;
+  currentGroupLabel: string | null;
+  currentGroupNodeCount: number | null;
+  message: string;
+};
+
 // 发起一次测速任务时需要的参数。
 export type StartRunParams = {
   // 选中的 Clash 配置文件路径。
@@ -139,6 +156,8 @@ export type AppRPC = {
     messages: {
       // 实时进度文本，例如当前正在测速的地区或步骤。
       progress: { message: string };
+      // 实时结构化进度，用于驱动进度条与当前测试目标展示。
+      runProgress: RunProgressState;
       // clash-speedtest 检测状态更新，用于驱动界面展示。
       clashSpeedtestStatus: ClashSpeedtestState;
     };

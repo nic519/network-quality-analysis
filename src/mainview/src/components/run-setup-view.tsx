@@ -5,7 +5,7 @@ import { Input } from "./ui/input";
 import { ScrollArea } from "./ui/scroll-area";
 import { getDiagnosticsSummary } from "./clash-speedtest-status";
 import { cn } from "../lib/utils";
-import type { AppState } from "../../../shared/rpc";
+import type { AppState, RunProgressState } from "../../../shared/rpc";
 
 export function RunSetupView({
   state,
@@ -18,6 +18,7 @@ export function RunSetupView({
   selectedSiteIds,
   onToggleSite,
   progress,
+  runProgress,
   progressLog,
   error,
   onStartRun,
@@ -35,6 +36,7 @@ export function RunSetupView({
   selectedSiteIds: string[];
   onToggleSite: (siteId: string) => void;
   progress: string;
+  runProgress: RunProgressState | null;
   progressLog: string[];
   error: string | null;
   onStartRun: () => void;
@@ -241,6 +243,8 @@ export function RunSetupView({
                 {isPending ? "测试中..." : "开始测试"}
               </Button>
 
+              {runProgress ? <RunProgressPanel progress={runProgress} /> : null}
+
               <div className="grid gap-1 text-sm">
                 <span className="min-w-0 break-words text-secondary-foreground">{progress}</span>
                 {error ? <span className="break-words text-destructive">{error}</span> : null}
@@ -258,6 +262,46 @@ export function RunSetupView({
         </section>
       </div>
     </section>
+  );
+}
+
+function RunProgressPanel({ progress }: { progress: RunProgressState }) {
+  const currentGroupText = progress.currentGroupLabel ?? "等待测速目标";
+  const completedText = `${progress.completedGroups} / ${progress.totalGroups} 组已完成`;
+  const nodeProgressText =
+    progress.currentGroupNodeIndex !== null && progress.currentGroupEstimatedNodeCount !== null
+      ? `第 ${progress.currentGroupNodeIndex} / ${progress.currentGroupEstimatedNodeCount} 个节点`
+      : progress.currentGroupNodeIndex !== null
+        ? `第 ${progress.currentGroupNodeIndex} 个节点`
+        : "等待节点进度";
+
+  return (
+    <div className="grid gap-2 rounded-md border border-border bg-card/45 px-3 py-3">
+      <div className="flex items-center justify-between gap-3 text-xs">
+        <span className="font-medium text-foreground">测试进度</span>
+        <span className="text-muted-foreground">{nodeProgressText}</span>
+      </div>
+      <div
+        role="progressbar"
+        aria-label="测速进度"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={progress.percent}
+        className="h-3 overflow-hidden rounded-full bg-secondary"
+      >
+        <div className="h-full rounded-full bg-primary transition-colors" style={{ width: `${progress.percent}%` }} />
+      </div>
+      <div className="grid gap-1">
+        <div className="text-xs text-muted-foreground">{completedText}</div>
+        <div className="flex items-center justify-between gap-3 text-sm">
+          <span className="text-muted-foreground">当前目标</span>
+          <span className="text-right font-medium text-foreground">{currentGroupText}</span>
+        </div>
+        {progress.currentGroupNodeCount !== null ? (
+          <div className="text-xs text-muted-foreground">当前组合已返回 {progress.currentGroupNodeCount} 个节点结果</div>
+        ) : null}
+      </div>
+    </div>
   );
 }
 

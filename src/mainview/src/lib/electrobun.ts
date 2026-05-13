@@ -7,6 +7,7 @@ import type {
   ClashSpeedtestState,
   ExportCsvResponse,
   ResetClashSpeedtestBinaryPathResponse,
+  RunProgressState,
   SetProbeSettingsParams,
   SetClashSpeedtestBinaryPathParams,
   SetTestSitesParams,
@@ -14,9 +15,11 @@ import type {
 } from "../../../shared/rpc";
 
 export type ProgressHandler = (message: string) => void;
+export type RunProgressHandler = (state: RunProgressState) => void;
 export type ClashSpeedtestStatusHandler = (state: ClashSpeedtestState) => void;
 
 let progressHandler: ProgressHandler | null = null;
+let runProgressHandler: RunProgressHandler | null = null;
 let clashSpeedtestStatusHandler: ClashSpeedtestStatusHandler | null = null;
 const isElectrobun = "__electrobunBunBridge" in window;
 
@@ -27,6 +30,7 @@ export const api = isElectrobun
         handlers: {
           messages: {
             progress: ({ message }) => progressHandler?.(message),
+            runProgress: (state) => runProgressHandler?.(state),
             clashSpeedtestStatus: (state) => clashSpeedtestStatusHandler?.(state),
           },
         },
@@ -38,6 +42,13 @@ export function onProgress(handler: ProgressHandler) {
   progressHandler = handler;
   return () => {
     if (progressHandler === handler) progressHandler = null;
+  };
+}
+
+export function onRunProgress(handler: RunProgressHandler) {
+  runProgressHandler = handler;
+  return () => {
+    if (runProgressHandler === handler) runProgressHandler = null;
   };
 }
 
@@ -112,6 +123,22 @@ function createPreviewApi() {
     getAppState: async (filters: HistoryFilters) => getFilteredState(filters),
     startRun: async (_params: StartRunParams) => {
       progressHandler?.("浏览器预览模式：真实测试会在 Electrobun 桌面应用内运行");
+      runProgressHandler?.({
+        stage: "completed",
+        completedGroups: 0,
+        totalGroups: 0,
+        percent: 100,
+        currentGroupNodeIndex: null,
+        currentGroupEstimatedNodeCount: null,
+        currentRegionId: null,
+        currentRegionLabel: null,
+        currentSiteId: null,
+        currentSiteName: null,
+        currentSiteUrl: null,
+        currentGroupLabel: null,
+        currentGroupNodeCount: null,
+        message: "浏览器预览模式：真实测试会在 Electrobun 桌面应用内运行",
+      });
       return getFilteredState({ runId: sample.runs[0]?.id });
     },
     selectConfigFile: async ({ currentPath }: { currentPath?: string }) => {

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { RunSetupView } from "./run-setup-view";
-import type { AppState } from "../../../shared/rpc";
+import type { AppState, RunProgressState } from "../../../shared/rpc";
 import { DEFAULT_PROBE_SETTINGS } from "../../../shared/probe-settings";
 
 const state: AppState = {
@@ -28,6 +28,23 @@ const state: AppState = {
 };
 
 describe("RunSetupView", () => {
+  const activeRunProgress: RunProgressState = {
+    stage: "running",
+    completedGroups: 1,
+    totalGroups: 4,
+    percent: 25,
+    currentGroupNodeIndex: 3,
+    currentGroupEstimatedNodeCount: 12,
+    currentRegionId: "hong-kong",
+    currentRegionLabel: "香港",
+    currentSiteId: "github",
+    currentSiteName: "GitHub",
+    currentSiteUrl: "https://github.com",
+    currentGroupLabel: "香港 -> GitHub",
+    currentGroupNodeCount: 18,
+    message: "正在测试 香港 -> GitHub (2/4)",
+  };
+
   test("recent preset list only enables horizontal scrolling", () => {
     const html = renderToStaticMarkup(
       <RunSetupView
@@ -44,6 +61,7 @@ describe("RunSetupView", () => {
         selectedSiteIds={["youtube", "github"]}
         onToggleSite={() => {}}
         progress="准备开始"
+        runProgress={null}
         progressLog={[]}
         error={null}
         onStartRun={() => {}}
@@ -54,5 +72,37 @@ describe("RunSetupView", () => {
     );
 
     expect(html).toContain("custom-scrollbar flex min-w-0 flex-nowrap gap-2 overflow-x-auto overflow-y-hidden pb-1");
+  });
+
+  test("renders a group progress bar and node estimate while a run is active", () => {
+    const html = renderToStaticMarkup(
+      <RunSetupView
+        state={state}
+        configPath="https://example.com/config.yaml"
+        onConfigPathChange={() => {}}
+        onSelectConfigFile={() => {}}
+        recentConfigPaths={[]}
+        selectedRegionIds={["hong-kong", "singapore"]}
+        onToggleRegion={() => {}}
+        selectedSiteIds={["youtube", "github"]}
+        onToggleSite={() => {}}
+        progress={activeRunProgress.message}
+        runProgress={activeRunProgress}
+        progressLog={["启动测试任务", activeRunProgress.message]}
+        error={null}
+        onStartRun={() => {}}
+        isPending={true}
+        diagnosticsHint={null}
+        onOpenDiagnostics={() => {}}
+      />,
+    );
+
+    expect(html).toContain('role="progressbar"');
+    expect(html).toContain("第 3 / 12 个节点");
+    expect(html).toContain("1 / 4 组已完成");
+    expect(html).toContain("当前目标");
+    expect(html).toContain("香港 -&gt; GitHub");
+    expect(html).toContain("当前组合已返回 18 个节点结果");
+    expect(html).toContain('aria-valuenow="25"');
   });
 });

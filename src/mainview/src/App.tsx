@@ -5,12 +5,12 @@ import { AnalysisView } from "./components/analysis-view";
 import { DiagnosticsView } from "./components/diagnostics-view";
 import type { MatrixRow } from "./lib/chart-data";
 import { buildCopyResultsText } from "./lib/copy-results-text";
-import { api, onClashSpeedtestStatus, onProgress } from "./lib/electrobun";
+import { api, onClashSpeedtestStatus, onProgress, onRunProgress } from "./lib/electrobun";
 import { buildAnalysisHistoryFilters } from "./lib/history-filters";
 import { DEFAULT_SITES, REGION_PRESETS, latencyToMs } from "../../shared/domain";
 import type { RegionPreset, SiteDefinition } from "../../shared/domain";
 import { DEFAULT_PROBE_SETTINGS, type ProbeSettings } from "../../shared/probe-settings";
-import type { AppState } from "../../shared/rpc";
+import type { AppState, RunProgressState } from "../../shared/rpc";
 
 const today = new Date().toISOString().slice(0, 10);
 export type ThemeMode = "system" | "light" | "dark";
@@ -43,6 +43,7 @@ export default function App() {
   const [selectedSiteId, setSelectedSiteId] = useState(DEFAULT_SITES[0]?.id ?? "");
   const [progress, setProgress] = useState("准备就绪");
   const [progressLog, setProgressLog] = useState<string[]>(["准备就绪"]);
+  const [runProgress, setRunProgress] = useState<RunProgressState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isRunPending, setIsRunPending] = useState(false);
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => readInitialThemeMode());
@@ -60,6 +61,15 @@ export default function App() {
       onProgress((message) => {
         setProgress(message);
         setProgressLog((current) => [...current.slice(-17), message]);
+      }),
+    [],
+  );
+
+  useEffect(
+    () =>
+      onRunProgress((nextRunProgress) => {
+        setRunProgress(nextRunProgress);
+        setProgress(nextRunProgress.message);
       }),
     [],
   );
@@ -127,6 +137,23 @@ export default function App() {
     setError(null);
     setProgress("启动测试任务");
     setProgressLog(["启动测试任务"]);
+    setRunProgress({
+      stage: "running",
+      completedGroups: 0,
+      totalGroups: selectedRegionIds.length * selectedSiteIds.length,
+      percent: 0,
+      currentGroupNodeIndex: null,
+      currentGroupEstimatedNodeCount: null,
+      currentRegionId: null,
+      currentRegionLabel: null,
+      currentSiteId: null,
+      currentSiteName: null,
+      currentSiteUrl: null,
+      currentGroupLabel: null,
+      currentGroupNodeCount: null,
+      message: "启动测试任务",
+    });
+    let didSucceed = false;
     try {
       const sitesForRun = state.sites.map((site) => ({ ...site, enabled: selectedSiteIds.includes(site.id) }));
       if (sitesForRun.length) {
@@ -141,6 +168,7 @@ export default function App() {
       setProgress("测试完成");
       setProgressLog((current) => [...current.slice(-17), "测试完成"]);
       setActiveView("analysis");
+      didSucceed = true;
     } catch (caught) {
       setError(toErrorMessage(caught));
       setProgress("测试失败");
@@ -148,6 +176,7 @@ export default function App() {
     } finally {
       isRunInFlightRef.current = false;
       setIsRunPending(false);
+      if (didSucceed) setRunProgress(null);
     }
   }
 
@@ -284,6 +313,7 @@ export default function App() {
             selectedSiteIds={selectedSiteIds}
             onToggleSite={toggleSite}
             progress={progress}
+            runProgress={runProgress}
             progressLog={progressLog}
             error={error}
             onStartRun={startRun}

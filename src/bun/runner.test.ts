@@ -321,6 +321,104 @@ describe("runLatencyTest", () => {
     );
   });
 
+  test("reports structured group progress for the current site and region", async () => {
+    const root = join(tmpdir(), `latency-runner-structured-progress-${Date.now()}`);
+    const binaryPath = join(root, "clash-speedtest");
+    const configPath = join(root, "config.yaml");
+    mkdirSync(root, { recursive: true });
+    writeFileSync(binaryPath, "");
+    writeFileSync(configPath, "");
+    const updates: Array<{
+      completedGroups: number;
+      totalGroups: number;
+      percent: number;
+      currentGroupLabel: string | null;
+      currentGroupNodeIndex: number | null;
+      currentGroupEstimatedNodeCount: number | null;
+      currentGroupNodeCount: number | null;
+      stage: string;
+    }> = [];
+
+    await runLatencyTest(
+      {
+        configPath,
+        regionIds: ["hong-kong"],
+      },
+      {
+        binaryPath,
+        sites: [site, { id: "github", name: "GitHub", url: "https://github.com", enabled: true }],
+        onStructuredProgress: (progress) =>
+          updates.push({
+            completedGroups: progress.completedGroups,
+            totalGroups: progress.totalGroups,
+            percent: progress.percent,
+            currentGroupLabel: progress.currentGroupLabel,
+            currentGroupNodeIndex: progress.currentGroupNodeIndex,
+            currentGroupEstimatedNodeCount: progress.currentGroupEstimatedNodeCount,
+            currentGroupNodeCount: progress.currentGroupNodeCount,
+            stage: progress.stage,
+          }),
+        execute: async (_binary, args, executeOptions) => {
+          const siteUrl = args[args.indexOf("--latency-url") + 1];
+          const proxyName = siteUrl.includes("github") ? "HK-02" : "HK-01";
+          executeOptions?.onProgress?.("[clash-speedtest] 1. warming up");
+          return `序号\t节点名称\t类型\t延迟\n1.\t${proxyName}\tTrojan\t128ms\n`;
+        },
+      },
+    );
+
+    expect(updates[0]).toEqual({
+      completedGroups: 0,
+      totalGroups: 2,
+      percent: 0,
+      currentGroupLabel: "香港 -> YouTube",
+      currentGroupNodeIndex: 0,
+      currentGroupEstimatedNodeCount: 4,
+      currentGroupNodeCount: null,
+      stage: "running",
+    });
+    expect(updates).toContainEqual({
+      completedGroups: 0,
+      totalGroups: 2,
+      percent: 13,
+      currentGroupLabel: "香港 -> YouTube",
+      currentGroupNodeIndex: 1,
+      currentGroupEstimatedNodeCount: 4,
+      currentGroupNodeCount: null,
+      stage: "running",
+    });
+    expect(updates).toContainEqual({
+      completedGroups: 1,
+      totalGroups: 2,
+      percent: 50,
+      currentGroupLabel: "香港 -> GitHub",
+      currentGroupNodeIndex: 0,
+      currentGroupEstimatedNodeCount: 1,
+      currentGroupNodeCount: null,
+      stage: "running",
+    });
+    expect(updates).toContainEqual({
+      completedGroups: 1,
+      totalGroups: 2,
+      percent: 100,
+      currentGroupLabel: "香港 -> GitHub",
+      currentGroupNodeIndex: 1,
+      currentGroupEstimatedNodeCount: 1,
+      currentGroupNodeCount: null,
+      stage: "running",
+    });
+    expect(updates.at(-1)).toEqual({
+      completedGroups: 2,
+      totalGroups: 2,
+      percent: 100,
+      currentGroupLabel: null,
+      currentGroupNodeIndex: null,
+      currentGroupEstimatedNodeCount: null,
+      currentGroupNodeCount: null,
+      stage: "completed",
+    });
+  });
+
   test("retries without probe flags when the installed clash-speedtest is older", async () => {
     const root = join(tmpdir(), `latency-runner-old-probe-${Date.now()}`);
     const binaryPath = join(root, "clash-speedtest");
