@@ -328,31 +328,61 @@ function ProbeTable({ rows }: { rows: ReturnType<typeof buildProbeRows> }) {
         <TableBody className="[&_tr:last-child]:border-0">
           {rows.slice(0, 12).map((row) => (
             <TableRow key={row.key} className="border-border hover:bg-accent/35">
-              <TableCell className="max-w-[260px] px-3 py-2.5">
+              <TableCell className="max-w-[260px] px-3 py-2">
                 <div className="truncate text-sm font-medium text-foreground" title={row.proxyName}>
                   {row.proxyName}
                 </div>
-                <div className="mt-0.5 text-xs text-muted-foreground">
+                <div className="mt-0.5 text-xs leading-4 text-muted-foreground">
                   {row.proxyType} / {row.regionLabel}
                 </div>
               </TableCell>
-              <TableCell className="px-3 py-2.5 text-sm text-foreground">{row.probeIp || "N/A"}</TableCell>
-              <TableCell className="px-3 py-2.5 text-sm text-muted-foreground">
-                {formatProbeLocation(row)}
+              <TableCell className="px-3 py-2 text-sm text-foreground">
+                <div className="break-all leading-5">{row.probeIp || "N/A"}</div>
               </TableCell>
-              <TableCell className="max-w-[260px] px-3 py-2.5">
-                <div className="truncate text-sm text-foreground" title={row.probeOrg || row.probeAsn || "N/A"}>
-                  {row.probeAsn || "N/A"}
-                  {row.probeOrg ? ` / ${row.probeOrg}` : ""}
-                </div>
+              <TableCell className="px-3 py-2">
+                <ProbeLocationCell row={row} />
               </TableCell>
-              <TableCell className="px-3 py-2.5 text-xs text-muted-foreground">
+              <TableCell className="max-w-[260px] px-3 py-2">
+                <ProbeAsnCell row={row} />
+              </TableCell>
+              <TableCell className="px-3 py-2 text-xs leading-4 text-muted-foreground">
                 {row.probeStatus ? `${row.probeStatus} / ${row.probeLatency || "N/A"}` : row.probeError || "N/A"}
               </TableCell>
             </TableRow>
           ))}
         </TableBody>
       </Table>
+    </div>
+  );
+}
+
+function ProbeLocationCell({ row }: { row: ReturnType<typeof buildProbeRows>[number] }) {
+  const [line1, line2] = formatProbeLocationLines(row);
+
+  if (!line1 && !line2) {
+    return <div className="text-sm leading-5 text-muted-foreground">N/A</div>;
+  }
+
+  return (
+    <div title={formatProbeLocationTitle(row)}>
+      {line1 ? <div className="text-sm leading-5 text-muted-foreground">{line1}</div> : null}
+      {line2 ? <div className="text-xs leading-4 text-muted-foreground">{line2}</div> : null}
+    </div>
+  );
+}
+
+function ProbeAsnCell({ row }: { row: ReturnType<typeof buildProbeRows>[number] }) {
+  const hasAsn = Boolean(row.probeAsn);
+  const hasOrg = Boolean(row.probeOrg);
+
+  if (!hasAsn && !hasOrg) {
+    return <div className="text-sm leading-5 text-foreground">N/A</div>;
+  }
+
+  return (
+    <div title={row.probeOrg || row.probeAsn || "N/A"}>
+      {hasAsn ? <div className="truncate text-sm leading-5 text-foreground">{row.probeAsn}</div> : null}
+      {hasOrg ? <div className="truncate text-xs leading-4 text-muted-foreground">{row.probeOrg}</div> : null}
     </div>
   );
 }
@@ -453,9 +483,15 @@ function probeResultScore(row: ReturnType<typeof makeProbeRow>) {
   return 0;
 }
 
-function formatProbeLocation(row: ReturnType<typeof buildProbeRows>[number]) {
-  const parts = [row.probeCountryCode, row.probeCountry, row.probeRegion, row.probeCity].filter(Boolean);
-  return parts.length ? parts.join(" / ") : "N/A";
+function formatProbeLocationLines(row: ReturnType<typeof buildProbeRows>[number]) {
+  const line1 = [row.probeCountryCode, row.probeCountry].filter(Boolean).join(" / ");
+  const line2 = [row.probeRegion, row.probeCity].filter(Boolean).join(" / ");
+  return [line1, line2] as const;
+}
+
+function formatProbeLocationTitle(row: ReturnType<typeof buildProbeRows>[number]) {
+  const [line1, line2] = formatProbeLocationLines(row);
+  return [line1, line2].filter(Boolean).join(" / ") || "N/A";
 }
 
 function buildRunScopedChartRows(

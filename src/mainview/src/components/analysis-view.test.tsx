@@ -82,6 +82,47 @@ describe("AnalysisView", () => {
     expect(html).toContain("203.0.113.88");
     expect(html).toContain("200 / 420ms");
   });
+
+  test("renders probe location and ASN content in grouped two-line blocks", () => {
+    const html = renderToStaticMarkup(
+      <AnalysisView
+        state={makeState([
+          makeResult({
+            proxyId: "proxy-us-01",
+            proxyName: "US-01",
+            probeIp: "23.94.213.251",
+            probeStatus: "200",
+            probeLatency: "698ms",
+            probeCountryCode: "US",
+            probeCountry: "United States",
+            probeRegion: "California",
+            probeCity: "Los Angeles",
+            probeAsn: "AS36352",
+            probeOrg: "HostPapa",
+          }),
+        ])}
+        selectedRunId="run-1"
+        onSelectedRunIdChange={() => {}}
+        fromDate="2026-05-13"
+        toDate="2026-05-13"
+        onFromDateChange={() => {}}
+        onToDateChange={() => {}}
+        search=""
+        onSearchChange={() => {}}
+        selectedSiteId="youtube"
+        onSelectedSiteIdChange={() => {}}
+        error={null}
+        onCopyResults={() => {}}
+      />,
+    );
+
+    expect(html).toContain("US / United States");
+    expect(html).toContain("California / Los Angeles");
+    expect(html).toContain("AS36352");
+    expect(html).toContain("HostPapa");
+    expect(html).toContain('class="text-sm leading-5 text-muted-foreground"');
+    expect(html).toContain('class="text-xs leading-4 text-muted-foreground"');
+  });
 });
 
 function makeState(results: ResultRow[]): AppState {
