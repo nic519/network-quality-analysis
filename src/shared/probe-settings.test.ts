@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { DEFAULT_PROBE_SETTINGS, normalizeProbeSettings } from "./probe-settings";
+import { DEFAULT_PROBE_SETTINGS, PROBE_PROVIDER_PRESETS, findProbeProviderPreset, normalizeProbeSettings } from "./probe-settings";
 
 describe("normalizeProbeSettings", () => {
   test("defaults to api.ip.sb geoip settings", () => {
@@ -8,6 +8,27 @@ describe("normalizeProbeSettings", () => {
     expect(DEFAULT_PROBE_SETTINGS.fields).toContain("ip=ip");
     expect(DEFAULT_PROBE_SETTINGS.fields).toContain("org=organization");
     expect(DEFAULT_PROBE_SETTINGS.timeout).toMatch(/^\d+s$/);
+  });
+
+  test("includes realip.cc as a built-in provider preset", () => {
+    const preset = PROBE_PROVIDER_PRESETS.find((item) => item.id === "realip-cc");
+
+    expect(preset?.settings.url).toBe("https://realip.cc/");
+    expect(preset?.settings.fields).toContain("country_code=iso_code");
+    expect(preset?.settings.fields).toContain("region=province");
+    expect(preset?.settings.fields).toContain("org=isp");
+  });
+
+  test("finds matching built-in provider presets", () => {
+    expect(findProbeProviderPreset(DEFAULT_PROBE_SETTINGS)?.id).toBe("ip-sb");
+    expect(
+      findProbeProviderPreset({
+        enabled: true,
+        url: "https://example.com/probe",
+        fields: "ip=query",
+        timeout: "12s",
+      }),
+    ).toBeNull();
   });
 
   test("keeps usable custom probe settings", () => {

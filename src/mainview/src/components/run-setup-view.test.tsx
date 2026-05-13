@@ -147,4 +147,33 @@ describe("RunSetupView", () => {
     expect(html).toContain(">香港</span><span class=\"shrink-0 text-xs text-muted-foreground\">6</span>");
     expect(html).toContain(">新加坡</span><span class=\"shrink-0 text-xs text-muted-foreground\">4</span>");
   });
+
+  test("renders svg flag markers in region selection and selected region summaries", () => {
+    const html = renderToStaticMarkup(
+      <RunSetupView
+        state={state}
+        configPath="https://example.com/config.yaml"
+        onConfigPathChange={() => {}}
+        onSelectConfigFile={() => {}}
+        recentConfigPaths={[]}
+        selectedRegionIds={["hong-kong"]}
+        onToggleRegion={() => {}}
+        configInspection={configInspection}
+        isInspectingConfig={false}
+        selectedSiteIds={["youtube"]}
+        onToggleSite={() => {}}
+        progress="已解析配置"
+        runProgress={null}
+        progressLog={[]}
+        error={null}
+        onStartRun={() => {}}
+        isPending={false}
+        diagnosticsHint={null}
+        onOpenDiagnostics={() => {}}
+      />,
+    );
+
+    expect(html).toContain('data-region-flag="HK"');
+    expect(html).toContain('data-region-flag="SG"');
+  });
 });

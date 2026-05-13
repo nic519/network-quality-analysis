@@ -6,7 +6,7 @@ import { Input } from "./ui/input";
 import { cn } from "../lib/utils";
 import { DEFAULT_SITES } from "../../../shared/domain";
 import type { SiteDefinition } from "../../../shared/domain";
-import { DEFAULT_PROBE_SETTINGS, type ProbeSettings } from "../../../shared/probe-settings";
+import { PROBE_PROVIDER_PRESETS, findProbeProviderPreset, type ProbeSettings } from "../../../shared/probe-settings";
 import type { AppState } from "../../../shared/rpc";
 import type { ThemeMode } from "../App";
 
@@ -44,6 +44,7 @@ export function DiagnosticsView({
   const [manualPath, setManualPath] = useState(state.source === "manual" ? state.path ?? "" : "");
   const [draftSites, setDraftSites] = useState<SiteDefinition[]>(sites);
   const [draftProbeSettings, setDraftProbeSettings] = useState<ProbeSettings>(probeSettings);
+  const [probeProviderMode, setProbeProviderMode] = useState(getProbeProviderMode(probeSettings));
   const [didCopyInstallCommand, setDidCopyInstallCommand] = useState(false);
 
   useEffect(() => {
@@ -56,6 +57,7 @@ export function DiagnosticsView({
 
   useEffect(() => {
     setDraftProbeSettings(probeSettings);
+    setProbeProviderMode(getProbeProviderMode(probeSettings));
   }, [probeSettings]);
 
   useEffect(() => {
@@ -183,12 +185,8 @@ export function DiagnosticsView({
             <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="text-sm font-semibold text-foreground">出口 Probe API</h2>
-                <p className="mt-1 text-xs text-muted-foreground">用于识别每个节点的出口 IP、地区和 ASN；请求会通过节点代理发出。</p>
+                <p className="mt-1 text-xs text-muted-foreground">用于识别每个节点的出口 IP、地区和 ASN；内置预设不需要手动维护 URL。</p>
               </div>
-              <Button type="button" variant="outline" size="sm" onClick={() => setDraftProbeSettings(DEFAULT_PROBE_SETTINGS)}>
-                <RotateCcw className="h-4 w-4" />
-                使用 ip.sb
-              </Button>
             </div>
             <div className="grid gap-3 px-3">
               <label className="inline-flex h-9 items-center gap-2 text-sm text-secondary-foreground">
@@ -201,30 +199,75 @@ export function DiagnosticsView({
                 />
                 <span>启用出口 Probe API</span>
               </label>
-              <label className="grid gap-1.5">
-                <span className="text-xs font-medium text-muted-foreground">Probe URL</span>
-                <Input
-                  value={draftProbeSettings.url}
-                  onChange={(event) => updateDraftProbeSettings({ url: event.target.value })}
-                  placeholder="https://api.ip.sb/geoip/"
-                />
-              </label>
-              <label className="grid gap-1.5">
-                <span className="text-xs font-medium text-muted-foreground">字段映射</span>
-                <Input
-                  value={draftProbeSettings.fields}
-                  onChange={(event) => updateDraftProbeSettings({ fields: event.target.value })}
-                  placeholder="ip=ip,country=country,country_code=country_code,asn=asn,org=organization"
-                />
-              </label>
-              <label className="grid gap-1.5 sm:max-w-[180px]">
-                <span className="text-xs font-medium text-muted-foreground">超时时间</span>
-                <Input
-                  value={draftProbeSettings.timeout}
-                  onChange={(event) => updateDraftProbeSettings({ timeout: event.target.value })}
-                  placeholder="8s"
-                />
-              </label>
+              <div className="grid gap-2 sm:grid-cols-3" role="radiogroup" aria-label="Probe API 提供商">
+                {PROBE_PROVIDER_PRESETS.map((preset) => (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={probeProviderMode === preset.id}
+                    className={cn(
+                      "rounded-md border px-3 py-2 text-left transition-colors",
+                      probeProviderMode === preset.id
+                        ? "border-primary bg-primary/10 text-foreground"
+                        : "border-input bg-secondary/35 text-secondary-foreground hover:bg-accent/65",
+                    )}
+                    onClick={() => selectProbeProviderPreset(preset.settings, preset.id)}
+                  >
+                    <span className="block text-sm font-semibold">{preset.label}</span>
+                    <span className="mt-1 block text-xs leading-5 text-muted-foreground">{preset.description}</span>
+                    <span className="mt-2 block break-all font-mono text-[11px] text-muted-foreground">{preset.settings.url}</span>
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={probeProviderMode === "custom"}
+                  className={cn(
+                    "rounded-md border px-3 py-2 text-left transition-colors",
+                    probeProviderMode === "custom"
+                      ? "border-primary bg-primary/10 text-foreground"
+                      : "border-input bg-secondary/35 text-secondary-foreground hover:bg-accent/65",
+                  )}
+                  onClick={() => setProbeProviderMode("custom")}
+                >
+                  <span className="block text-sm font-semibold">自定义</span>
+                  <span className="mt-1 block text-xs leading-5 text-muted-foreground">需要使用自己的 Probe API 时再填写 URL、字段映射和超时时间。</span>
+                  <span className="mt-2 block break-all font-mono text-[11px] text-muted-foreground">{draftProbeSettings.url}</span>
+                </button>
+              </div>
+              {probeProviderMode === "custom" ? (
+                <div className="grid gap-3 rounded-md border border-border bg-secondary/25 p-3">
+                  <label className="grid gap-1.5">
+                    <span className="text-xs font-medium text-muted-foreground">Probe URL</span>
+                    <Input
+                      value={draftProbeSettings.url}
+                      onChange={(event) => updateDraftProbeSettings({ url: event.target.value })}
+                      placeholder="https://api.ip.sb/geoip/"
+                    />
+                  </label>
+                  <label className="grid gap-1.5">
+                    <span className="text-xs font-medium text-muted-foreground">字段映射</span>
+                    <Input
+                      value={draftProbeSettings.fields}
+                      onChange={(event) => updateDraftProbeSettings({ fields: event.target.value })}
+                      placeholder="ip=ip,country=country,country_code=country_code,asn=asn,org=organization"
+                    />
+                  </label>
+                  <label className="grid gap-1.5 sm:max-w-[180px]">
+                    <span className="text-xs font-medium text-muted-foreground">超时时间</span>
+                    <Input
+                      value={draftProbeSettings.timeout}
+                      onChange={(event) => updateDraftProbeSettings({ timeout: event.target.value })}
+                      placeholder="8s"
+                    />
+                  </label>
+                </div>
+              ) : (
+                <p className="rounded-md border border-border bg-secondary/25 px-3 py-2 text-xs leading-5 text-muted-foreground">
+                  当前使用内置预设。需要调整 URL 或字段映射时，切换到“自定义”；也可以随时点选 ip.sb 或 realip.cc 切回内置预设。
+                </p>
+              )}
               <div className="flex justify-end">
                 <Button type="button" size="sm" onClick={() => onSaveProbeSettings(draftProbeSettings)}>
                   <Save className="h-4 w-4" />
@@ -258,7 +301,18 @@ export function DiagnosticsView({
                 {didCopyInstallCommand ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
               </Button>
             </div>
-            {state.path ? <div className="break-all rounded-md border border-border bg-secondary/35 px-3 py-2 text-sm text-secondary-foreground">{state.path}</div> : null}
+            <div className="grid gap-1">
+              {state.path ? (
+                <p className="break-all text-xs leading-5 text-muted-foreground">
+                  路径：<span className="font-mono text-[12px] text-secondary-foreground">{state.path}</span>
+                </p>
+              ) : null}
+              {state.version ? (
+                <p className="text-xs leading-5 text-muted-foreground">
+                  版本：<span className="font-mono text-[12px] text-secondary-foreground">{state.version}</span>
+                </p>
+              ) : null}
+            </div>
           </section>
 
           <section className="py-5">
@@ -328,6 +382,11 @@ export function DiagnosticsView({
   function updateDraftProbeSettings(patch: Partial<ProbeSettings>) {
     setDraftProbeSettings((current) => ({ ...current, ...patch }));
   }
+
+  function selectProbeProviderPreset(settings: ProbeSettings, providerId: string) {
+    setProbeProviderMode(providerId);
+    setDraftProbeSettings((current) => ({ ...settings, enabled: current.enabled }));
+  }
 }
 
 const themeOptions: Array<{ id: ThemeMode; label: string; icon: typeof Monitor }> = [
@@ -343,4 +402,8 @@ function createBlankSite(): SiteDefinition {
     url: "",
     enabled: true,
   };
+}
+
+function getProbeProviderMode(settings: ProbeSettings) {
+  return findProbeProviderPreset(settings)?.id ?? "custom";
 }

@@ -1,8 +1,10 @@
+import type { ReactNode } from "react";
 import { Check, ChevronDown, FileSearch, Loader2, Play, Route, Target, TerminalSquare } from "lucide-react";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { ScrollArea } from "./ui/scroll-area";
+import { CountryFlag, getRegionFlagCode } from "./country-flag";
 import { getDiagnosticsSummary } from "./clash-speedtest-status";
 import { cn } from "../lib/utils";
 import type { AppState, ConfigInspectionResult, RunProgressState } from "../../../shared/rpc";
@@ -118,6 +120,7 @@ export function RunSetupView({
                   <SelectableButton
                     key={region.id}
                     selected={selectedRegionIds.includes(region.id)}
+                    leadingVisual={<CountryFlag code={getRegionFlagCode(region.id)} label={region.label} markerName="data-region-flag" />}
                     label={region.label}
                     meta={buildRegionCountLabel(region.id, configInspection, isInspectingConfig)}
                     onClick={() => onToggleRegion(region.id)}
@@ -157,7 +160,20 @@ export function RunSetupView({
                 <PreviewRow
                   icon={Route}
                   title="筛出节点"
-                  body={selectedRegions.length ? selectedRegions.map((region) => region.label).join("、") : "请选择至少一个节点地区"}
+                  body={
+                    selectedRegions.length ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedRegions.map((region) => (
+                          <span key={region.id} className="inline-flex items-center gap-1.5 rounded bg-secondary px-2 py-0.5 text-sm text-foreground">
+                            <CountryFlag code={getRegionFlagCode(region.id)} label={region.label} markerName="data-region-flag" />
+                            <span>{region.label}</span>
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      "请选择至少一个节点地区"
+                    )
+                  }
                 />
                 <PreviewRow
                   icon={Target}
@@ -188,6 +204,7 @@ export function RunSetupView({
                         <Badge variant="outline" className="border-border bg-secondary text-secondary-foreground">
                           {region.shortLabel}
                         </Badge>
+                        <CountryFlag code={getRegionFlagCode(region.id)} label={region.label} markerName="data-region-flag" />
                         <span className="font-medium text-foreground">{region.label}</span>
                       </div>
                       <div className="flex flex-wrap gap-1.5">
@@ -326,11 +343,13 @@ function StepHeading({ number, title, description }: { number: string; title: st
 
 function SelectableButton({
   selected,
+  leadingVisual,
   label,
   meta,
   onClick,
 }: {
   selected: boolean;
+  leadingVisual?: ReactNode;
   label: string;
   meta?: string | null;
   onClick: () => void;
@@ -357,6 +376,7 @@ function SelectableButton({
       >
         {selected ? <Check className="h-3 w-3" /> : null}
       </span>
+      {leadingVisual}
       <span className="min-w-0 flex-1 truncate">{label}</span>
       {meta ? <span className="shrink-0 text-xs text-muted-foreground">{meta}</span> : null}
     </Button>
@@ -379,7 +399,7 @@ function PreviewRow({
 }: {
   icon: typeof Route;
   title: string;
-  body: string;
+  body: ReactNode;
 }) {
   return (
     <div className="grid grid-cols-[28px_minmax(0,1fr)] gap-3">

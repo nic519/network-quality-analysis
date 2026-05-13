@@ -120,7 +120,9 @@ describe("AnalysisView", () => {
     expect(html).toContain("California / Los Angeles");
     expect(html).toContain("AS36352");
     expect(html).toContain("HostPapa");
-    expect(html).toContain('class="text-sm leading-5 text-muted-foreground"');
+    expect(html).toContain('data-region-flag="HK"');
+    expect(html).toContain('data-country-flag="US"');
+    expect(html).toContain('class="flex items-center gap-1.5 text-sm leading-5 text-muted-foreground"');
     expect(html).toContain('class="text-xs leading-4 text-muted-foreground"');
   });
 

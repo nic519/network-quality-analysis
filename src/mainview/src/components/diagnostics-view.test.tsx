@@ -40,6 +40,53 @@ describe("DiagnosticsView", () => {
     expect(html).toContain("github.com/nic519/clash-speedtest@latest");
     expect(html).toContain('aria-label="启用出口 Probe API"');
     expect(html).toContain(">测速工具状态</h2><div class=\"flex items-center gap-2 text-sm text-secondary-foreground\"");
+    expect(html).toContain("路径：");
+    expect(html).toContain("/Users/nicholas/go/bin/clash-speedtest");
+    expect(html).toContain("版本：");
+    expect(html).toContain("1.0.0");
     expect(html).toContain("当前使用系统命令依赖。 手动指定路径，或切回系统命令依赖。");
   });
+
+  test("renders built-in probe providers without exposing custom inputs by default", () => {
+    const html = renderDiagnosticsView(DEFAULT_PROBE_SETTINGS);
+
+    expect(html).toContain("ip.sb");
+    expect(html).toContain("realip.cc");
+    expect(html).toContain("当前使用内置预设");
+    expect(html).not.toContain("<span class=\"text-xs font-medium text-muted-foreground\">Probe URL</span>");
+  });
+
+  test("renders custom probe inputs for custom provider settings", () => {
+    const html = renderDiagnosticsView({
+      enabled: true,
+      url: "https://example.com/probe",
+      fields: "ip=query,country=country",
+      timeout: "12s",
+    });
+
+    expect(html).toContain('aria-checked="true"');
+    expect(html).toContain("https://example.com/probe");
+    expect(html).toContain("<span class=\"text-xs font-medium text-muted-foreground\">Probe URL</span>");
+    expect(html).toContain("ip=query,country=country");
+  });
 });
+
+function renderDiagnosticsView(probeSettings = DEFAULT_PROBE_SETTINGS) {
+  return renderToStaticMarkup(
+    <DiagnosticsView
+      state={state}
+      sites={sites}
+      probeSettings={probeSettings}
+      onSelectBinary={() => {}}
+      onSetBinaryPath={async () => {}}
+      onResetBinaryPath={async () => {}}
+      onSaveSites={async () => {}}
+      onSaveProbeSettings={async () => {}}
+      onExportAllResults={() => {}}
+      onCopyInstallCommand={async () => {}}
+      canExportResults={false}
+      themeMode="system"
+      onThemeModeChange={() => {}}
+    />,
+  );
+}
