@@ -43,9 +43,10 @@ export function buildSpeedtestArgs(
   region: RegionPreset,
   site: SiteDefinition,
   probeSettings: ProbeSettings = DEFAULT_PROBE_SETTINGS,
+  options: { includeProbe?: boolean } = {},
 ): string[] {
   const normalizedProbeSettings = normalizeProbeSettings(probeSettings);
-  return [
+  const args = [
     "-c",
     configPath,
     "-f",
@@ -56,15 +57,24 @@ export function buildSpeedtestArgs(
     site.url,
     "-timeout",
     "8s",
-    "--probe-url",
-    normalizedProbeSettings.url,
-    "--probe-method",
-    "GET",
-    "--probe-timeout",
-    normalizedProbeSettings.timeout,
-    "--probe-fields",
-    normalizedProbeSettings.fields,
+    "--latency-timeout",
+    "8s",
   ];
+
+  if (normalizedProbeSettings.enabled && options.includeProbe !== false) {
+    args.push(
+      "--probe-url",
+      normalizedProbeSettings.url,
+      "--probe-method",
+      "GET",
+      "--probe-timeout",
+      normalizedProbeSettings.timeout,
+      "--probe-fields",
+      normalizedProbeSettings.fields,
+    );
+  }
+
+  return args;
 }
 
 export async function runLatencyTest(request: RunRequest, options: RunnerOptions = {}): Promise<RunOutput> {
@@ -92,14 +102,18 @@ export async function runLatencyTest(request: RunRequest, options: RunnerOptions
     for (const region of selectedRegions) {
       activeRun = createRegionRun(now(), region);
       runs.push(activeRun);
+      let includeProbeForRegion = normalizeProbeSettings(options.probeSettings).enabled;
 
       for (const site of sites) {
         options.onProgress?.(`测试 ${region.label} -> ${site.name}`);
-        const args = buildSpeedtestArgs(configPath, region, site, options.probeSettings);
+        const args = buildSpeedtestArgs(configPath, region, site, options.probeSettings, {
+          includeProbe: includeProbeForRegion,
+        });
         options.onProgress?.(`运行 ${formatSpeedtestCommand(args)}`);
         const raw = await executeWithProbeFallback(binaryPath, args, execute, options);
         const rows = normalizeSpeedtestRows(raw, activeRun.id, region, site);
         results.push(...rows);
+        includeProbeForRegion = false;
       }
 
       activeRun.status = "completed";

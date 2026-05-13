@@ -5,7 +5,7 @@ import packageJson from "../../package.json";
 import type { ClashSpeedtestState } from "../shared/rpc";
 
 const GO_INSTALL_COMMAND = "go install github.com/nic519/clash-speedtest@latest";
-export const REQUIRED_CLASH_SPEEDTEST_VERSION = packageJson.version;
+export const MINIMUM_CLASH_SPEEDTEST_VERSION = packageJson.version;
 
 export type ResolveClashSpeedtestOptions = {
   platform?: NodeJS.Platform;
@@ -53,14 +53,14 @@ export async function getClashSpeedtestState(options: ClashSpeedtestStatusOption
   try {
     const versionOutput = await readVersion(local.path);
     const version = parseClashSpeedtestVersion(versionOutput);
-    if (version !== REQUIRED_CLASH_SPEEDTEST_VERSION) {
+    if (!isClashSpeedtestVersionSupported(version, MINIMUM_CLASH_SPEEDTEST_VERSION)) {
       return makeClashSpeedtestState({
         status: "error",
         version,
         path: local.path,
         source: local.source,
         checkedAt: now().toISOString(),
-        message: `clash-speedtest 版本不匹配：需要 ${REQUIRED_CLASH_SPEEDTEST_VERSION}，当前是 ${version || "未知"}。请重新编译或安装对应版本。`,
+        message: `clash-speedtest 版本不匹配：需要 >= ${MINIMUM_CLASH_SPEEDTEST_VERSION}，当前是 ${version || "未知"}。请重新编译或安装对应版本。`,
       });
     }
 
@@ -78,7 +78,7 @@ export async function getClashSpeedtestState(options: ClashSpeedtestStatusOption
       path: local.path,
       source: local.source,
       checkedAt: now().toISOString(),
-      message: `无法读取 clash-speedtest 版本。请重新编译或安装 ${REQUIRED_CLASH_SPEEDTEST_VERSION} 版本。${toErrorMessage(error)}`,
+      message: `无法读取 clash-speedtest 版本。请重新编译或安装 >= ${MINIMUM_CLASH_SPEEDTEST_VERSION} 的版本。${toErrorMessage(error)}`,
     });
   }
 }
@@ -86,6 +86,10 @@ export async function getClashSpeedtestState(options: ClashSpeedtestStatusOption
 export function parseClashSpeedtestVersion(output: string) {
   const match = output.match(/clash-speedtest version\s+([^\s]+)/i);
   return match?.[1] ?? "";
+}
+
+export function isClashSpeedtestVersionSupported(version: string, minimumVersion = MINIMUM_CLASH_SPEEDTEST_VERSION) {
+  return compareSemver(version, minimumVersion) >= 0;
 }
 
 async function readClashSpeedtestVersion(binaryPath: string) {
@@ -116,6 +120,31 @@ async function readText(stream: ReadableStream<Uint8Array>) {
 
 function toErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
+}
+
+function compareSemver(left: string, right: string) {
+  const leftParts = normalizeVersionParts(left);
+  const rightParts = normalizeVersionParts(right);
+  if (!leftParts || !rightParts) return -1;
+
+  const length = Math.max(leftParts.length, rightParts.length);
+  for (let index = 0; index < length; index += 1) {
+    const leftPart = leftParts[index] ?? 0;
+    const rightPart = rightParts[index] ?? 0;
+    if (leftPart > rightPart) return 1;
+    if (leftPart < rightPart) return -1;
+  }
+  return 0;
+}
+
+function normalizeVersionParts(version: string) {
+  const normalized = version.trim().replace(/^v/i, "");
+  if (!normalized) return null;
+
+  const core = normalized.split("-", 1)[0];
+  const parts = core.split(".").map((part) => Number.parseInt(part, 10));
+  if (parts.some((part) => Number.isNaN(part))) return null;
+  return parts;
 }
 
 export function getLocalClashSpeedtestInstall(options: ClashSpeedtestStatusOptions = {}): LocalClashSpeedtestInstall {

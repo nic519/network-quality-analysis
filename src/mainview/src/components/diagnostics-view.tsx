@@ -191,6 +191,16 @@ export function DiagnosticsView({
               </Button>
             </div>
             <div className="grid gap-3 px-3">
+              <label className="inline-flex h-9 items-center gap-2 text-sm text-secondary-foreground">
+                <input
+                  type="checkbox"
+                  checked={draftProbeSettings.enabled}
+                  onChange={(event) => updateDraftProbeSettings({ enabled: event.target.checked })}
+                  className="h-4 w-4 accent-[hsl(var(--primary))]"
+                  aria-label="启用出口 Probe API"
+                />
+                <span>启用出口 Probe API</span>
+              </label>
               <label className="grid gap-1.5">
                 <span className="text-xs font-medium text-muted-foreground">Probe URL</span>
                 <Input

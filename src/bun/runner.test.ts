@@ -30,6 +30,8 @@ describe("buildSpeedtestArgs", () => {
       "https://www.youtube.com/generate_204",
       "-timeout",
       "8s",
+      "--latency-timeout",
+      "8s",
       "--probe-url",
       "https://api.ip.sb/geoip/",
       "--probe-method",
@@ -44,14 +46,28 @@ describe("buildSpeedtestArgs", () => {
   test("uses configured probe settings when building args", () => {
     expect(
       buildSpeedtestArgs("config.yaml", REGION_PRESETS[0], site, {
+        enabled: true,
         url: "https://example.com/probe",
         fields: "ip=query,country=country",
         timeout: "12s",
       }),
     ).toContain("https://example.com/probe");
-    expect(buildSpeedtestArgs("config.yaml", REGION_PRESETS[0], site, { url: "https://example.com/probe", fields: "ip=query", timeout: "12s" })).toEqual(
+    expect(buildSpeedtestArgs("config.yaml", REGION_PRESETS[0], site, { enabled: true, url: "https://example.com/probe", fields: "ip=query", timeout: "12s" })).toEqual(
       expect.arrayContaining(["--probe-timeout", "12s", "--probe-fields", "ip=query"]),
     );
+  });
+
+  test("omits probe flags when probe is disabled", () => {
+    const args = buildSpeedtestArgs("config.yaml", REGION_PRESETS[0], site, {
+      enabled: false,
+      url: "https://example.com/probe",
+      fields: "ip=query",
+      timeout: "12s",
+    });
+
+    expect(args).toContain("--latency-timeout");
+    expect(args).not.toContain("--probe-url");
+    expect(args).not.toContain("https://example.com/probe");
   });
 });
 
@@ -110,6 +126,7 @@ describe("runLatencyTest", () => {
         binaryPath,
         sites: [site],
         probeSettings: {
+          enabled: true,
           url: "https://example.com/probe",
           fields: "ip=query",
           timeout: "12s",
@@ -124,6 +141,7 @@ describe("runLatencyTest", () => {
 
     expect(calls).toEqual([
       buildSpeedtestArgs(configPath, REGION_PRESETS[0], site, {
+        enabled: true,
         url: "https://example.com/probe",
         fields: "ip=query",
         timeout: "12s",
@@ -133,6 +151,37 @@ describe("runLatencyTest", () => {
     expect(calls[0]).toContain("https://example.com/probe");
     expect(output.run.status).toBe("completed");
     expect(output.results).toHaveLength(1);
+  });
+
+  test("runs probe only on the first enabled site for each region", async () => {
+    const root = join(tmpdir(), `latency-runner-probe-once-${Date.now()}`);
+    const binaryPath = join(root, "clash-speedtest");
+    const configPath = join(root, "config.yaml");
+    mkdirSync(root, { recursive: true });
+    writeFileSync(binaryPath, "");
+    writeFileSync(configPath, "");
+    const githubSite = { id: "github", name: "GitHub", url: "https://github.com", enabled: true };
+    const calls: string[][] = [];
+
+    await runLatencyTest(
+      {
+        configPath,
+        regionIds: ["hong-kong"],
+      },
+      {
+        binaryPath,
+        sites: [site, githubSite],
+        execute: async (_binary, args) => {
+          calls.push(args);
+          return "序号\t节点名称\t类型\t延迟\n1.\tHK-01\tTrojan\t128ms\n";
+        },
+      },
+    );
+
+    expect(calls).toHaveLength(2);
+    expect(calls[0]).toContain("--probe-url");
+    expect(calls[1]).not.toContain("--probe-url");
+    expect(calls[1]).toContain("--latency-timeout");
   });
 
   test("skips disabled configured sites", async () => {

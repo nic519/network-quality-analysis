@@ -25,7 +25,7 @@ bun install
 go install github.com/nic519/clash-speedtest@latest
 ```
 
-当前桌面 app 会校验 `clash-speedtest -v` 输出的版本号，要求它和本应用 `package.json` 里的版本一致。当前要求版本为 `0.1.3`。如果本机二进制版本不匹配，依赖状态会显示为不可用，需要先在 Go 项目中重新编译：
+当前桌面 app 会校验 `clash-speedtest -v` 输出的版本号，要求它不低于本应用 `package.json` 里的最低版本要求。当前最低要求为 `0.1.3`，因此 `0.1.3` 及以上版本都可以使用。如果本机二进制版本过低，依赖状态会显示为不可用，需要先在 Go 项目中重新编译：
 
 ```bash
 cd /Users/nicholas/Desktop/my_program/clash-speedtest
@@ -33,19 +33,22 @@ go build -ldflags "-X main.version=0.1.3 -X main.commit=$(git rev-parse --short 
 ~/go/bin/clash-speedtest -v
 ```
 
-开发时如果使用手动路径或 `CLASH_SPEEDTEST_PATH`，也需要指向同版本的二进制。
+开发时如果使用手动路径或 `CLASH_SPEEDTEST_PATH`，也需要指向满足最低版本要求的二进制。
 
 ## 出口 IP Probe API
 
 应用会让 `clash-speedtest` 通过每个节点访问 Probe API，用于记录节点出口 IP、国家/地区、ASN 和组织信息。默认配置为：
 
 ```text
+启用: 是
 Probe URL: https://api.ip.sb/geoip/
 字段映射: ip=ip,country=country,country_code=country_code,region=region,city=city,asn=asn,org=organization
 超时时间: 8s
 ```
 
-如果某个 IP API 在你的网络或节点出口下不可用，可以在“工具设置”里的“出口 Probe API”切换 URL、字段映射和超时时间。保存后，下一次测速会使用新的配置。
+如果某个 IP API 在你的网络或节点出口下不可用，可以在“工具设置”里的“出口 Probe API”关闭 Probe，或切换 URL、字段映射和超时时间。保存后，下一次测速会使用新的配置。
+
+为了避免 IP API 影响整体测速，桌面 app 只会在每个地区的第一个启用网站上执行出口 Probe；YouTube、X、GitHub 等目标站点的延迟测试使用独立的 `--latency-timeout 8s`，不会再被 `--max-latency` 的筛选阈值误当作请求超时。
 
 ## 本地开发
 

@@ -47,10 +47,9 @@ export function AnalysisView({
   const scopedResults = filterScopedResults(state.results, selectedRunId);
   const chartRows = buildRunScopedChartRows(scopedResults, search, selectedSite?.name);
   const availableChartRows = chartRows.filter((row) => row.isAvailable);
-  const recommendedRows = availableChartRows.slice(0, 3);
   const failedSiteRows = buildFailedSiteRows(scopedResults, search);
   const probeRows = buildProbeRows(scopedResults, search);
-  const fastestRow = recommendedRows[0];
+  const fastestRow = availableChartRows[0];
 
   return (
     <section className="h-full min-h-0">
@@ -189,30 +188,6 @@ export function AnalysisView({
                     <ProbeTable rows={probeRows} />
                   </section>
                 ) : null}
-                {recommendedRows.length ? (
-                  <div className="grid gap-2 lg:grid-cols-3">
-                    {recommendedRows.map((row, index) => (
-                      <div key={`recommend-${row.key}`} className="rounded-md border border-border bg-card/45 px-3 py-3">
-                        <div className="mb-2 flex items-center justify-between gap-2">
-                          <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
-                            第 {index + 1} 名
-                          </Badge>
-                          <span className="text-sm font-semibold text-foreground">{row.latencyLabel}</span>
-                        </div>
-                        <div className="truncate text-sm font-medium text-foreground" title={row.proxyName}>
-                          {row.proxyName}
-                        </div>
-                        <div className="mt-1 text-xs text-muted-foreground">
-                          {row.proxyType} / {row.regionLabel} / {selectedSite?.name}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="rounded-md border border-dashed border-border bg-secondary/30 px-3 py-4 text-sm text-muted-foreground">
-                    还没有可推荐的节点。完成一次测速后，这里会直接显示最快的结果。
-                  </div>
-                )}
               </div>
 
               <div className="mb-3 flex min-w-0 flex-wrap items-center gap-2">
@@ -443,26 +418,39 @@ function buildProbeRows(results: AppState["results"], search: string) {
   for (const result of results) {
     if (normalizedSearch && !result.proxyName.toLowerCase().includes(normalizedSearch)) continue;
     if (!result.probeIp && !result.probeStatus && !result.probeError) continue;
-    if (rows.has(result.proxyId)) continue;
-    rows.set(result.proxyId, {
-      key: result.proxyId,
-      proxyName: result.proxyName,
-      proxyType: result.proxyType,
-      regionLabel: result.regionLabel,
-      probeIp: result.probeIp ?? "",
-      probeCountry: result.probeCountry ?? "",
-      probeCountryCode: result.probeCountryCode ?? "",
-      probeRegion: result.probeRegion ?? "",
-      probeCity: result.probeCity ?? "",
-      probeAsn: result.probeAsn ?? "",
-      probeOrg: result.probeOrg ?? "",
-      probeLatency: result.probeLatency ?? "",
-      probeStatus: result.probeStatus ?? "",
-      probeError: result.probeError ?? "",
-    });
+    const nextRow = makeProbeRow(result);
+    const existing = rows.get(result.proxyId);
+    if (existing && probeResultScore(existing) >= probeResultScore(nextRow)) continue;
+    rows.set(result.proxyId, nextRow);
   }
 
   return [...rows.values()].sort((a, b) => a.proxyName.localeCompare(b.proxyName, "zh-CN"));
+}
+
+function makeProbeRow(result: AppState["results"][number]) {
+  return {
+    key: result.proxyId,
+    proxyName: result.proxyName,
+    proxyType: result.proxyType,
+    regionLabel: result.regionLabel,
+    probeIp: result.probeIp ?? "",
+    probeCountry: result.probeCountry ?? "",
+    probeCountryCode: result.probeCountryCode ?? "",
+    probeRegion: result.probeRegion ?? "",
+    probeCity: result.probeCity ?? "",
+    probeAsn: result.probeAsn ?? "",
+    probeOrg: result.probeOrg ?? "",
+    probeLatency: result.probeLatency ?? "",
+    probeStatus: result.probeStatus ?? "",
+    probeError: result.probeError ?? "",
+  };
+}
+
+function probeResultScore(row: ReturnType<typeof makeProbeRow>) {
+  if (row.probeIp) return 3;
+  if (row.probeStatus && !row.probeError) return 2;
+  if (row.probeStatus) return 1;
+  return 0;
 }
 
 function formatProbeLocation(row: ReturnType<typeof buildProbeRows>[number]) {
