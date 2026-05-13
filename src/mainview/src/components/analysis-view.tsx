@@ -404,6 +404,7 @@ function FailureTable({ rows }: { rows: ReturnType<typeof buildFailedSiteRows> }
         <TableHeader className="[&_tr]:border-border">
           <TableRow className="hover:bg-transparent">
             <TableHead className="h-9 px-3 text-xs text-muted-foreground">节点</TableHead>
+            <TableHead className="h-9 px-3 text-xs text-muted-foreground">出口 IP</TableHead>
             <TableHead className="h-9 px-3 text-xs text-muted-foreground">失败网站</TableHead>
           </TableRow>
         </TableHeader>
@@ -416,6 +417,9 @@ function FailureTable({ rows }: { rows: ReturnType<typeof buildFailedSiteRows> }
                   <span className="mx-2 text-muted-foreground">·</span>
                   <span className="text-xs text-muted-foreground">{row.proxyType} / {row.regionLabel}</span>
                 </div>
+              </TableCell>
+              <TableCell className="px-3 py-2.5 text-sm text-foreground">
+                <span className="break-all">{row.probeIp || "未获取"}</span>
               </TableCell>
               <TableCell className="px-3 py-2.5">
                 <div className="flex flex-wrap gap-1.5">
@@ -700,6 +704,7 @@ function buildFailedSiteRows(results: AppState["results"], search: string) {
       proxyName: string;
       proxyType: string;
       regionLabel: string;
+      probeIp: string;
       failedSites: string[];
     }
   >();
@@ -709,6 +714,7 @@ function buildFailedSiteRows(results: AppState["results"], search: string) {
     if (latencyToMs(result.latency) !== null) continue;
 
     const key = result.proxyId;
+    const probeIp = (result.probeIp ?? "").trim();
     const existing = failures.get(key);
     if (!existing) {
       failures.set(key, {
@@ -716,9 +722,14 @@ function buildFailedSiteRows(results: AppState["results"], search: string) {
         proxyName: result.proxyName,
         proxyType: result.proxyType,
         regionLabel: result.regionLabel,
+        probeIp,
         failedSites: [result.siteName],
       });
       continue;
+    }
+
+    if (!existing.probeIp && probeIp) {
+      existing.probeIp = probeIp;
     }
 
     if (!existing.failedSites.includes(result.siteName)) {
