@@ -1,6 +1,6 @@
 import { Database } from "bun:sqlite";
 import { latencyToMs, type HistoryFilters, type ResultRow, type RunRecord } from "../shared/domain";
-import type { ConfigHistoryItem } from "../shared/rpc";
+import type { ConfigHistoryItem, ProxyHistoryStat } from "../shared/rpc";
 
 type RunRow = {
   id: string;
@@ -48,12 +48,8 @@ type ConfigHistoryRow = {
 
 type ProxyHistoryStatRow = {
   proxy_id: string;
+  site_name: string;
   latency: string;
-};
-
-export type ProxyHistoryStat = {
-  totalCount: number;
-  failedCount: number;
 };
 
 export class LatencyDatabase {
@@ -455,13 +451,14 @@ export class LatencyDatabase {
     const params = Object.fromEntries(normalizedProxyIds.map((proxyId, index) => [`$proxyId${index}`, proxyId]));
     const rows = this.db
       .query<ProxyHistoryStatRow, Record<string, string>>(`
-        SELECT proxy_id, latency
+        SELECT proxy_id, site_name, latency
         FROM results
         WHERE proxy_id IN (${placeholders.join(", ")})
       `)
       .all(params);
 
     const stats: Record<string, ProxyHistoryStat> = {};
+    const siteStats = new Map<string, Map<string, { totalCount: number; failedCount: number }>>();
     for (const row of rows) {
       const current = stats[row.proxy_id] ?? { totalCount: 0, failedCount: 0 };
       current.totalCount += 1;
@@ -469,6 +466,25 @@ export class LatencyDatabase {
         current.failedCount += 1;
       }
       stats[row.proxy_id] = current;
+
+      const sitesForProxy = siteStats.get(row.proxy_id) ?? new Map<string, { totalCount: number; failedCount: number }>();
+      const currentSite = sitesForProxy.get(row.site_name) ?? { totalCount: 0, failedCount: 0 };
+      currentSite.totalCount += 1;
+      if (latencyToMs(row.latency) === null) {
+        currentSite.failedCount += 1;
+      }
+      sitesForProxy.set(row.site_name, currentSite);
+      siteStats.set(row.proxy_id, sitesForProxy);
+    }
+
+    for (const [proxyId, sitesForProxy] of siteStats) {
+      stats[proxyId].siteStats = [...sitesForProxy.entries()]
+        .map(([siteName, siteStat]) => ({
+          siteName,
+          totalCount: siteStat.totalCount,
+          failedCount: siteStat.failedCount,
+        }))
+        .sort((left, right) => left.siteName.localeCompare(right.siteName, "zh-CN"));
     }
 
     return stats;

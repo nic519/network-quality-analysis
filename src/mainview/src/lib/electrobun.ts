@@ -235,6 +235,7 @@ function makePreviewResult(
 function buildPreviewProxyHistoryStats(allResults: ResultRow[], scopedResults: ResultRow[]) {
   const targetProxyIds = new Set(scopedResults.map((row) => row.proxyId).filter(Boolean));
   const stats: AppState["proxyHistoryStats"] = {};
+  const siteStats = new Map<string, Map<string, { totalCount: number; failedCount: number }>>();
 
   for (const row of allResults) {
     if (!targetProxyIds.has(row.proxyId)) continue;
@@ -244,6 +245,25 @@ function buildPreviewProxyHistoryStats(allResults: ResultRow[], scopedResults: R
       current.failedCount += 1;
     }
     stats[row.proxyId] = current;
+
+    const sitesForProxy = siteStats.get(row.proxyId) ?? new Map<string, { totalCount: number; failedCount: number }>();
+    const currentSite = sitesForProxy.get(row.siteName) ?? { totalCount: 0, failedCount: 0 };
+    currentSite.totalCount += 1;
+    if (latencyToMs(row.latency) === null) {
+      currentSite.failedCount += 1;
+    }
+    sitesForProxy.set(row.siteName, currentSite);
+    siteStats.set(row.proxyId, sitesForProxy);
+  }
+
+  for (const [proxyId, sitesForProxy] of siteStats) {
+    stats[proxyId].siteStats = [...sitesForProxy.entries()]
+      .map(([siteName, siteStat]) => ({
+        siteName,
+        totalCount: siteStat.totalCount,
+        failedCount: siteStat.failedCount,
+      }))
+      .sort((left, right) => left.siteName.localeCompare(right.siteName, "zh-CN"));
   }
 
   return stats;

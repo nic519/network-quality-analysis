@@ -78,7 +78,11 @@ describe("AnalysisView", () => {
             proxyHistoryStats: {
               "proxy-tw-01": {
                 failedCount: 2,
-                totalCount: 4,
+                totalCount: 5,
+                siteStats: [
+                  { siteName: "YouTube", failedCount: 1, totalCount: 3 },
+                  { siteName: "X", failedCount: 1, totalCount: 2 },
+                ],
               },
             },
           } as AppState
@@ -99,7 +103,9 @@ describe("AnalysisView", () => {
     );
 
     expect(html).toContain("历史失败 / 总次数");
-    expect(html).toContain("2 / 4");
+    expect(html).toContain("2 / 5");
+    expect(html).toContain("YouTube 1 / 3");
+    expect(html).toContain("X 1 / 2");
   });
 
   test("does not render recommendation ranking cards in history view", () => {

@@ -221,7 +221,7 @@ describe("LatencyDatabase", () => {
     db.close();
   });
 
-  test("counts historical total and failed results by proxy id", () => {
+  test("counts historical total and failed results by proxy id and site", () => {
     const db = new LatencyDatabase();
     db.migrate();
 
@@ -230,8 +230,9 @@ describe("LatencyDatabase", () => {
     db.saveResults([
       makeResult("run-1", "hong-kong", "YouTube", "128ms"),
       makeResult("run-1", "hong-kong", "GitHub", "N/A"),
+      makeResult("run-1", "hong-kong", "X", "timeout"),
       makeResult("run-2", "hong-kong", "YouTube", "188ms"),
-      makeResult("run-2", "hong-kong", "GitHub", "N/A"),
+      makeResult("run-2", "hong-kong", "GitHub", "220ms"),
       {
         ...makeResult("run-2", "hong-kong", "X", "timeout"),
         proxyId: "hong-kong-alt-id",
@@ -240,12 +241,18 @@ describe("LatencyDatabase", () => {
 
     expect(db.queryProxyHistoryStats(["hong-kong-stable-id", "hong-kong-alt-id", "missing-id"])).toEqual({
       "hong-kong-stable-id": {
-        totalCount: 4,
+        totalCount: 5,
         failedCount: 2,
+        siteStats: [
+          { siteName: "GitHub", totalCount: 2, failedCount: 1 },
+          { siteName: "X", totalCount: 1, failedCount: 1 },
+          { siteName: "YouTube", totalCount: 2, failedCount: 0 },
+        ],
       },
       "hong-kong-alt-id": {
         totalCount: 1,
         failedCount: 1,
+        siteStats: [{ siteName: "X", totalCount: 1, failedCount: 1 }],
       },
     });
 

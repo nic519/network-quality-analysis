@@ -471,7 +471,22 @@ function FailureTable({ rows }: { rows: ReturnType<typeof buildFailedSiteRows> }
                 <span className="break-all">{row.probeIp || "未获取"}</span>
               </TableCell>
               <TableCell className="px-3 py-2.5 text-sm text-foreground">
-                {row.historyFailedCount} / {row.historyTotalCount}
+                <div className="space-y-1.5">
+                  <div className="font-medium">{row.historyFailedCount} / {row.historyTotalCount}</div>
+                  {row.historySiteStats.length ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {row.historySiteStats.map((site) => (
+                        <Badge
+                          key={`${row.key}-history-${site.siteName}`}
+                          variant="outline"
+                          className="border-border bg-secondary/70 text-[11px] font-normal text-muted-foreground"
+                        >
+                          {site.siteName} {site.failedCount} / {site.totalCount}
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
               </TableCell>
               <TableCell className="px-3 py-2.5">
                 <div className="flex flex-wrap gap-1.5">
@@ -763,6 +778,7 @@ function buildFailedSiteRows(results: AppState["results"], search: string, proxy
       probeIp: string;
       historyFailedCount: number;
       historyTotalCount: number;
+      historySiteStats: NonNullable<AppState["proxyHistoryStats"][string]["siteStats"]>;
       failedSites: string[];
     }
   >();
@@ -784,6 +800,7 @@ function buildFailedSiteRows(results: AppState["results"], search: string, proxy
         probeIp,
         historyFailedCount: historyStats.failedCount,
         historyTotalCount: historyStats.totalCount,
+        historySiteStats: historyStats.siteStats ?? [],
         failedSites: [result.siteName],
       });
       continue;

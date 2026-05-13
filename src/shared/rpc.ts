@@ -147,6 +147,17 @@ export type ProxyHistoryStat = {
   totalCount: number;
   // 该 proxyId 在历史结果中的失败次数。
   failedCount: number;
+  // 按测试网站拆解后的历史失败/总次数统计。
+  siteStats?: ProxyHistorySiteStat[];
+};
+
+export type ProxyHistorySiteStat = {
+  // 测试网站展示名，例如 YouTube、X。
+  siteName: string;
+  // 该 proxyId 在该网站历史结果中出现的总次数。
+  totalCount: number;
+  // 该 proxyId 在该网站历史结果中的失败次数。
+  failedCount: number;
 };
 
 // 应用进程与 WebView 之间共享的 RPC 协议定义。
