@@ -197,12 +197,14 @@ async function getAppState(filters: HistoryFilters = {}) {
       checkedAt: clashSpeedtestState.checkedAt,
     });
   }
+  const results = db.queryResults(filters);
   return {
     regions: REGION_PRESETS,
     sites: testSites,
     probeSettings,
     runs: db.listRuns(),
-    results: db.queryResults(filters),
+    results,
+    proxyHistoryStats: db.queryProxyHistoryStats(results.map((row) => row.proxyId)),
     configHistory: db.listConfigHistory(),
     clashSpeedtest: clashSpeedtestState,
   };

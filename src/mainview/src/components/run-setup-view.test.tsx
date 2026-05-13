@@ -16,6 +16,7 @@ const state: AppState = {
   probeSettings: DEFAULT_PROBE_SETTINGS,
   runs: [],
   results: [],
+  proxyHistoryStats: {},
   configHistory: [],
   clashSpeedtest: {
     status: "ready",

@@ -62,6 +62,46 @@ describe("AnalysisView", () => {
     expect(html).toContain("36.231.118.136");
   });
 
+  test("renders historical failed and total counts in the failed records table", () => {
+    const html = renderToStaticMarkup(
+      <AnalysisView
+        state={
+          {
+            ...makeState([
+              makeResult({
+                proxyId: "proxy-tw-01",
+                proxyName: "TW-01",
+                latency: "N/A",
+                probeIp: "36.231.118.136",
+              }),
+            ]),
+            proxyHistoryStats: {
+              "proxy-tw-01": {
+                failedCount: 2,
+                totalCount: 4,
+              },
+            },
+          } as AppState
+        }
+        selectedRunId="run-1"
+        onSelectedRunIdChange={() => {}}
+        fromDate="2026-05-13"
+        toDate="2026-05-13"
+        onFromDateChange={() => {}}
+        onToDateChange={() => {}}
+        search=""
+        onSearchChange={() => {}}
+        selectedSiteId="youtube"
+        onSelectedSiteIdChange={() => {}}
+        error={null}
+        onCopyResults={() => {}}
+      />,
+    );
+
+    expect(html).toContain("历史失败 / 总次数");
+    expect(html).toContain("2 / 4");
+  });
+
   test("does not render recommendation ranking cards in history view", () => {
     const html = renderToStaticMarkup(
       <AnalysisView
@@ -126,6 +166,59 @@ describe("AnalysisView", () => {
     expect(html).not.toContain("全部运行");
     expect(html).toContain('data-region-flag="JP"');
     expect(html).toContain('>日本</span><span class="min-w-0 truncate font-medium text-muted-foreground">run-1</span>');
+  });
+
+  test("renders a clearly labeled delete button in the history list", () => {
+    const html = renderToStaticMarkup(
+      <AnalysisView
+        state={makeState([])}
+        selectedRunId="run-1"
+        onSelectedRunIdChange={() => {}}
+        fromDate="2026-05-13"
+        toDate="2026-05-13"
+        onFromDateChange={() => {}}
+        onToDateChange={() => {}}
+        search=""
+        onSearchChange={() => {}}
+        selectedSiteId="youtube"
+        onSelectedSiteIdChange={() => {}}
+        error={null}
+        onCopyResults={() => {}}
+        onDeleteRun={() => {}}
+      />,
+    );
+
+    expect(html).toContain(">删除</span>");
+  });
+
+  test("renders an in-app delete confirmation prompt when a run is pending deletion", () => {
+    const html = renderToStaticMarkup(
+      <AnalysisView
+        state={makeState([])}
+        selectedRunId="run-1"
+        onSelectedRunIdChange={() => {}}
+        fromDate="2026-05-13"
+        toDate="2026-05-13"
+        onFromDateChange={() => {}}
+        onToDateChange={() => {}}
+        search=""
+        onSearchChange={() => {}}
+        selectedSiteId="youtube"
+        onSelectedSiteIdChange={() => {}}
+        error={null}
+        onCopyResults={() => {}}
+        onDeleteRun={() => {}}
+        pendingDeleteRunLabel="run-1 · 2026/05/13 04:00"
+        onConfirmDeleteRun={() => {}}
+        onCancelDeleteRun={() => {}}
+      />,
+    );
+
+    expect(html).toContain("确定删除这次历史测试？");
+    expect(html).toContain('role="alertdialog"');
+    expect(html).toContain("确认删除");
+    expect(html).toContain("取消");
+    expect(html).toContain("删除后会从数据库移除对应结果。");
   });
 
   test("prefers a successful probe result over an earlier probe error for the same proxy", () => {
@@ -457,6 +550,7 @@ function makeState(results: ResultRow[]): AppState {
       },
     ],
     results,
+    proxyHistoryStats: {},
     configHistory: [],
     clashSpeedtest: {
       status: "ready",

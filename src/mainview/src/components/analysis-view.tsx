@@ -8,6 +8,7 @@ import { Input } from "./ui/input";
 import { ScrollArea } from "./ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { ProbeDetailsPanel } from "./probe-details-panel";
+import { ConfirmationDialog } from "./ui/confirmation-dialog";
 import type { LatencyChartRow } from "../lib/chart-data";
 import { formatRunRegionLabels } from "../lib/run-region-label";
 import { cn } from "../lib/utils";
@@ -49,6 +50,9 @@ export function AnalysisView({
   error,
   onCopyResults,
   onDeleteRun,
+  pendingDeleteRunLabel,
+  onConfirmDeleteRun,
+  onCancelDeleteRun,
 }: {
   state: AppState;
   selectedRunId: string;
@@ -64,6 +68,9 @@ export function AnalysisView({
   error: string | null;
   onCopyResults: () => void;
   onDeleteRun?: (runId: string) => void;
+  pendingDeleteRunLabel?: string | null;
+  onConfirmDeleteRun?: () => void;
+  onCancelDeleteRun?: () => void;
 }) {
   const [probeSortMode, setProbeSortMode] = useState<ProbeSortMode>("proxy-name");
   const [isProbeDetailsOpen, setProbeDetailsOpen] = useState(false);
@@ -74,7 +81,7 @@ export function AnalysisView({
   const scopedResults = filterScopedResults(state.results, effectiveSelectedRunId);
   const chartRows = buildRunScopedChartRows(scopedResults, search, selectedSite?.name);
   const availableChartRows = chartRows.filter((row) => row.isAvailable);
-  const failedSiteRows = buildFailedSiteRows(scopedResults, search);
+  const failedSiteRows = buildFailedSiteRows(scopedResults, search, state.proxyHistoryStats);
   const probeRows = buildProbeRows(scopedResults, search, probeSortMode);
   const probeSummary = buildProbeSummary(scopedResults, search);
   const fastestRow = availableChartRows[0];
@@ -127,12 +134,13 @@ export function AnalysisView({
                     {onDeleteRun ? (
                       <Button
                         type="button"
-                        variant="ghost"
-                        className="h-7 w-7 shrink-0 rounded-md text-muted-foreground opacity-80 hover:bg-destructive/15 hover:text-destructive"
+                        variant="outline"
+                        className="h-8 shrink-0 gap-1 rounded-md border-border/80 px-2 text-xs text-muted-foreground hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
                         title="删除历史测试"
                         onClick={() => onDeleteRun(run.id)}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
+                        <span>删除</span>
                       </Button>
                     ) : null}
                   </div>
@@ -311,6 +319,18 @@ export function AnalysisView({
         onSortModeChange={setProbeSortMode}
         onClose={() => setProbeDetailsOpen(false)}
       />
+      {pendingDeleteRunLabel && onConfirmDeleteRun && onCancelDeleteRun ? (
+        <ConfirmationDialog
+          open
+          title="确定删除这次历史测试？"
+          detail={pendingDeleteRunLabel}
+          description="删除后会从数据库移除对应结果。"
+          confirmLabel="确认删除"
+          cancelLabel="取消"
+          onConfirm={onConfirmDeleteRun}
+          onCancel={onCancelDeleteRun}
+        />
+      ) : null}
     </section>
   );
 }
@@ -408,6 +428,7 @@ function FailureTable({ rows }: { rows: ReturnType<typeof buildFailedSiteRows> }
           <TableRow className="hover:bg-transparent">
             <TableHead className="h-9 px-3 text-xs text-muted-foreground">节点</TableHead>
             <TableHead className="h-9 px-3 text-xs text-muted-foreground">出口 IP</TableHead>
+            <TableHead className="h-9 px-3 text-xs text-muted-foreground">历史失败 / 总次数</TableHead>
             <TableHead className="h-9 px-3 text-xs text-muted-foreground">失败网站</TableHead>
           </TableRow>
         </TableHeader>
@@ -423,6 +444,9 @@ function FailureTable({ rows }: { rows: ReturnType<typeof buildFailedSiteRows> }
               </TableCell>
               <TableCell className="px-3 py-2.5 text-sm text-foreground">
                 <span className="break-all">{row.probeIp || "未获取"}</span>
+              </TableCell>
+              <TableCell className="px-3 py-2.5 text-sm text-foreground">
+                {row.historyFailedCount} / {row.historyTotalCount}
               </TableCell>
               <TableCell className="px-3 py-2.5">
                 <div className="flex flex-wrap gap-1.5">
@@ -702,7 +726,7 @@ function buildSelectableSites(sites: SiteDefinition[], results: AppState["result
   return [...siteMap.values()];
 }
 
-function buildFailedSiteRows(results: AppState["results"], search: string) {
+function buildFailedSiteRows(results: AppState["results"], search: string, proxyHistoryStats: AppState["proxyHistoryStats"]) {
   const normalizedSearch = search.trim().toLowerCase();
   const failures = new Map<
     string,
@@ -712,6 +736,8 @@ function buildFailedSiteRows(results: AppState["results"], search: string) {
       proxyType: string;
       regionLabel: string;
       probeIp: string;
+      historyFailedCount: number;
+      historyTotalCount: number;
       failedSites: string[];
     }
   >();
@@ -722,6 +748,7 @@ function buildFailedSiteRows(results: AppState["results"], search: string) {
 
     const key = result.proxyId;
     const probeIp = (result.probeIp ?? "").trim();
+    const historyStats = proxyHistoryStats[key] ?? { failedCount: 0, totalCount: 0 };
     const existing = failures.get(key);
     if (!existing) {
       failures.set(key, {
@@ -730,6 +757,8 @@ function buildFailedSiteRows(results: AppState["results"], search: string) {
         proxyType: result.proxyType,
         regionLabel: result.regionLabel,
         probeIp,
+        historyFailedCount: historyStats.failedCount,
+        historyTotalCount: historyStats.totalCount,
         failedSites: [result.siteName],
       });
       continue;

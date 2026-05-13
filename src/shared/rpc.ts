@@ -17,6 +17,8 @@ export type AppState = {
   runs: RunRecord[];
   // 历史测速结果明细。
   results: ResultRow[];
+  // 当前结果涉及节点的历史失败/总次数统计，按 proxyId 索引。
+  proxyHistoryStats: Record<string, ProxyHistoryStat>;
   // 配置文件使用历史，用于快速回填最近选择过的配置。
   configHistory: ConfigHistoryItem[];
   // clash-speedtest 可执行文件的检测状态。
@@ -138,6 +140,13 @@ export type ConfigHistoryItem = {
   lastUsedAt: string;
   // 被使用的累计次数。
   useCount: number;
+};
+
+export type ProxyHistoryStat = {
+  // 该 proxyId 在历史结果中出现的总次数。
+  totalCount: number;
+  // 该 proxyId 在历史结果中的失败次数。
+  failedCount: number;
 };
 
 // 应用进程与 WebView 之间共享的 RPC 协议定义。

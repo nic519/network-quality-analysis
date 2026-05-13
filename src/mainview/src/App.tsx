@@ -23,6 +23,7 @@ export default function App() {
     configHistory: [],
     runs: [],
     results: [],
+    proxyHistoryStats: {},
     clashSpeedtest: {
       status: "missing",
       version: null,
@@ -41,6 +42,7 @@ export default function App() {
   const [toDate, setToDate] = useState(today);
   const [search, setSearch] = useState("");
   const [selectedSiteId, setSelectedSiteId] = useState(DEFAULT_SITES[0]?.id ?? "");
+  const [pendingDeleteRunId, setPendingDeleteRunId] = useState<string | null>(null);
   const [progress, setProgress] = useState("准备就绪");
   const [progressLog, setProgressLog] = useState<string[]>(["准备就绪"]);
   const [runProgress, setRunProgress] = useState<RunProgressState | null>(null);
@@ -263,11 +265,17 @@ export default function App() {
     }
   }
 
-  async function deleteRun(runId: string) {
-    const run = state.runs.find((item) => item.id === runId);
-    const label = run ? formatRunDeleteLabel(run) : runId;
-    if (!window.confirm(`确定删除这次历史测试？\n${label}\n\n删除后会从数据库移除对应结果。`)) return;
+  function requestDeleteRun(runId: string) {
+    setPendingDeleteRunId(runId);
+  }
 
+  function cancelDeleteRun() {
+    setPendingDeleteRunId(null);
+  }
+
+  async function confirmDeleteRun() {
+    if (!pendingDeleteRunId) return;
+    const runId = pendingDeleteRunId;
     setError(null);
     try {
       const nextState = await api.deleteRun({ runId });
@@ -279,6 +287,7 @@ export default function App() {
 
       setSelectedRunId(nextSelectedRunId);
       setState(await api.getAppState(nextFilters));
+      setPendingDeleteRunId(null);
       setProgress("已删除历史测试");
     } catch (caught) {
       setError(toErrorMessage(caught));
@@ -359,6 +368,9 @@ export default function App() {
     }
   }
 
+  const pendingDeleteRun = pendingDeleteRunId ? state.runs.find((run) => run.id === pendingDeleteRunId) ?? null : null;
+  const pendingDeleteRunLabel = pendingDeleteRun ? formatRunDeleteLabel(pendingDeleteRun) : null;
+
   return (
     <main className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
       <header className="shrink-0 border-b border-border bg-card">
@@ -405,7 +417,10 @@ export default function App() {
             onSelectedSiteIdChange={setSelectedSiteId}
             error={error}
             onCopyResults={copyResults}
-            onDeleteRun={deleteRun}
+            onDeleteRun={requestDeleteRun}
+            pendingDeleteRunLabel={pendingDeleteRunLabel}
+            onConfirmDeleteRun={confirmDeleteRun}
+            onCancelDeleteRun={cancelDeleteRun}
           />
         ) : null}
 

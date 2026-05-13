@@ -1,5 +1,5 @@
 import { Database } from "bun:sqlite";
-import type { HistoryFilters, ResultRow, RunRecord } from "../shared/domain";
+import { latencyToMs, type HistoryFilters, type ResultRow, type RunRecord } from "../shared/domain";
 import type { ConfigHistoryItem } from "../shared/rpc";
 
 type RunRow = {
@@ -44,6 +44,16 @@ type ConfigHistoryRow = {
   path: string;
   last_used_at: string;
   use_count: number;
+};
+
+type ProxyHistoryStatRow = {
+  proxy_id: string;
+  latency: string;
+};
+
+export type ProxyHistoryStat = {
+  totalCount: number;
+  failedCount: number;
 };
 
 export class LatencyDatabase {
@@ -435,6 +445,33 @@ export class LatencyDatabase {
       .all(params);
 
     return rows.map(fromDbRow);
+  }
+
+  queryProxyHistoryStats(proxyIds: string[]): Record<string, ProxyHistoryStat> {
+    const normalizedProxyIds = [...new Set(proxyIds.map((proxyId) => proxyId.trim()).filter(Boolean))];
+    if (!normalizedProxyIds.length) return {};
+
+    const placeholders = normalizedProxyIds.map((_, index) => `$proxyId${index}`);
+    const params = Object.fromEntries(normalizedProxyIds.map((proxyId, index) => [`$proxyId${index}`, proxyId]));
+    const rows = this.db
+      .query<ProxyHistoryStatRow, Record<string, string>>(`
+        SELECT proxy_id, latency
+        FROM results
+        WHERE proxy_id IN (${placeholders.join(", ")})
+      `)
+      .all(params);
+
+    const stats: Record<string, ProxyHistoryStat> = {};
+    for (const row of rows) {
+      const current = stats[row.proxy_id] ?? { totalCount: 0, failedCount: 0 };
+      current.totalCount += 1;
+      if (latencyToMs(row.latency) === null) {
+        current.failedCount += 1;
+      }
+      stats[row.proxy_id] = current;
+    }
+
+    return stats;
   }
 
   private addColumnIfMissing(tableName: string, columnName: string, definition: string) {

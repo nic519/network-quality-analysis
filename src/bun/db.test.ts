@@ -220,6 +220,37 @@ describe("LatencyDatabase", () => {
 
     db.close();
   });
+
+  test("counts historical total and failed results by proxy id", () => {
+    const db = new LatencyDatabase();
+    db.migrate();
+
+    db.saveRun(makeRun("run-1", "2026-05-07T10:00:00.000Z"));
+    db.saveRun(makeRun("run-2", "2026-05-07T10:05:00.000Z"));
+    db.saveResults([
+      makeResult("run-1", "hong-kong", "YouTube", "128ms"),
+      makeResult("run-1", "hong-kong", "GitHub", "N/A"),
+      makeResult("run-2", "hong-kong", "YouTube", "188ms"),
+      makeResult("run-2", "hong-kong", "GitHub", "N/A"),
+      {
+        ...makeResult("run-2", "hong-kong", "X", "timeout"),
+        proxyId: "hong-kong-alt-id",
+      },
+    ]);
+
+    expect(db.queryProxyHistoryStats(["hong-kong-stable-id", "hong-kong-alt-id", "missing-id"])).toEqual({
+      "hong-kong-stable-id": {
+        totalCount: 4,
+        failedCount: 2,
+      },
+      "hong-kong-alt-id": {
+        totalCount: 1,
+        failedCount: 1,
+      },
+    });
+
+    db.close();
+  });
 });
 
 function makeRun(id: string, startedAt: string): RunRecord {

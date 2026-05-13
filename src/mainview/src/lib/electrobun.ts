@@ -1,5 +1,5 @@
 import { Electroview } from "electrobun/view";
-import { DEFAULT_SITES, REGION_PRESETS, type HistoryFilters, type RegionPreset } from "../../../shared/domain";
+import { DEFAULT_SITES, REGION_PRESETS, latencyToMs, type HistoryFilters, type RegionPreset, type ResultRow } from "../../../shared/domain";
 import { DEFAULT_PROBE_SETTINGS } from "../../../shared/probe-settings";
 import { APP_RPC_TIMEOUT_MS, type AppRPC } from "../../../shared/rpc";
 import type {
@@ -63,6 +63,17 @@ export function onClashSpeedtestStatus(handler: ClashSpeedtestStatusHandler) {
 }
 
 function createPreviewApi() {
+  const sampleResults = [
+    makePreviewResult("preview-run", "hong-kong", "香港", "HK-03", "Trojan", "YouTube", "128ms"),
+    makePreviewResult("preview-run", "hong-kong", "香港", "HK-03", "Trojan", "X", "152ms"),
+    makePreviewResult("preview-run", "hong-kong", "香港", "HK-03", "Trojan", "GitHub", "286ms"),
+    makePreviewResult("preview-run", "hong-kong", "香港", "HK-11", "Vmess", "YouTube", "312ms"),
+    makePreviewResult("preview-run", "hong-kong", "香港", "HK-11", "Vmess", "X", "N/A"),
+    makePreviewResult("preview-run", "hong-kong", "香港", "HK-11", "Vmess", "GitHub", "188ms"),
+    makePreviewResult("preview-run-previous", "hong-kong", "香港", "HK-03", "Trojan", "YouTube", "166ms"),
+    makePreviewResult("preview-run-previous", "hong-kong", "香港", "HK-03", "Trojan", "X", "190ms"),
+    makePreviewResult("preview-run-previous", "hong-kong", "香港", "HK-03", "Trojan", "GitHub", "340ms"),
+  ];
   const sample: AppState = {
     regions: REGION_PRESETS,
     sites: DEFAULT_SITES,
@@ -100,27 +111,23 @@ function createPreviewApi() {
         errorMessage: null,
       },
     ],
-    results: [
-      makePreviewResult("preview-run", "hong-kong", "香港", "HK-03", "Trojan", "YouTube", "128ms"),
-      makePreviewResult("preview-run", "hong-kong", "香港", "HK-03", "Trojan", "X", "152ms"),
-      makePreviewResult("preview-run", "hong-kong", "香港", "HK-03", "Trojan", "GitHub", "286ms"),
-      makePreviewResult("preview-run", "hong-kong", "香港", "HK-11", "Vmess", "YouTube", "312ms"),
-      makePreviewResult("preview-run", "hong-kong", "香港", "HK-11", "Vmess", "X", "N/A"),
-      makePreviewResult("preview-run", "hong-kong", "香港", "HK-11", "Vmess", "GitHub", "188ms"),
-      makePreviewResult("preview-run-previous", "hong-kong", "香港", "HK-03", "Trojan", "YouTube", "166ms"),
-      makePreviewResult("preview-run-previous", "hong-kong", "香港", "HK-03", "Trojan", "X", "190ms"),
-      makePreviewResult("preview-run-previous", "hong-kong", "香港", "HK-03", "Trojan", "GitHub", "340ms"),
-    ],
+    results: sampleResults,
+    proxyHistoryStats: buildPreviewProxyHistoryStats(sampleResults, sampleResults),
   };
 
-  const getFilteredState = (filters: HistoryFilters = {}) => ({
-    ...sample,
-    results: sample.results.filter((row) => {
+  const getFilteredState = (filters: HistoryFilters = {}) => {
+    const results = sample.results.filter((row) => {
       if (filters.runId && row.runId !== filters.runId) return false;
       if (filters.regionIds?.length && !filters.regionIds.includes(row.regionId)) return false;
       return true;
-    }),
-  });
+    });
+
+    return {
+      ...sample,
+      results,
+      proxyHistoryStats: buildPreviewProxyHistoryStats(sample.results, results),
+    };
+  };
 
   return {
     getAppState: async (filters: HistoryFilters) => getFilteredState(filters),
@@ -223,4 +230,21 @@ function makePreviewResult(
     downloadSpeed: "N/A",
     uploadSpeed: "N/A",
   };
+}
+
+function buildPreviewProxyHistoryStats(allResults: ResultRow[], scopedResults: ResultRow[]) {
+  const targetProxyIds = new Set(scopedResults.map((row) => row.proxyId).filter(Boolean));
+  const stats: AppState["proxyHistoryStats"] = {};
+
+  for (const row of allResults) {
+    if (!targetProxyIds.has(row.proxyId)) continue;
+    const current = stats[row.proxyId] ?? { totalCount: 0, failedCount: 0 };
+    current.totalCount += 1;
+    if (latencyToMs(row.latency) === null) {
+      current.failedCount += 1;
+    }
+    stats[row.proxyId] = current;
+  }
+
+  return stats;
 }
