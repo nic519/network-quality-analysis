@@ -3,7 +3,7 @@ import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
 import { ScrollArea } from "./ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
-import type { ProbeRow, ProbeSortMode } from "./analysis-view";
+import type { ProbeRow, ProbeSortMode } from "../lib/analysis-data";
 
 export function ProbeDetailsPanel({
   open,

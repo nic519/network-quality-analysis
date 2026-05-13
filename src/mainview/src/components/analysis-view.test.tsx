@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { AnalysisView, LatencyTooltipContent, buildProbeRows, buildProbeSummary, buildRunScopedChartRows } from "./analysis-view";
+import { RunHistorySidebar } from "./run-history-sidebar";
 import { ProbeDetailsPanel } from "./probe-details-panel";
+import { getEffectiveSelectedRunId, getVisibleRunItems } from "../lib/analysis-data";
 import type { AppState } from "../../../shared/rpc";
 import { DEFAULT_PROBE_SETTINGS } from "../../../shared/probe-settings";
 import { DEFAULT_SITES, REGION_PRESETS, type ResultRow } from "../../../shared/domain";
@@ -174,7 +176,39 @@ describe("AnalysisView", () => {
     expect(html).toContain('>日本</span><span class="min-w-0 truncate font-medium text-muted-foreground">run-1</span>');
   });
 
-  test("renders a clearly labeled delete button in the history list", () => {
+  test("exposes the historical run list as a standalone sidebar component", () => {
+    const state = makeState([
+      makeResult({
+        regionId: "japan",
+        regionLabel: "日本",
+        proxyName: "JP-01",
+      }),
+    ]);
+
+    const html = renderToStaticMarkup(
+      <RunHistorySidebar
+        runs={state.runs}
+        results={state.results}
+        regions={state.regions}
+        selectedRunId="run-1"
+        onSelectedRunIdChange={() => {}}
+        onDeleteRun={() => {}}
+      />,
+    );
+
+    expect(html).toContain("历史测试");
+    expect(html).toContain('data-region-flag="JP"');
+    expect(html).toContain('aria-label="历史测试"');
+  });
+
+  test("keeps run selection policy in the analysis data module", () => {
+    const state = makeState([]);
+
+    expect(getVisibleRunItems(state.runs)).toHaveLength(1);
+    expect(getEffectiveSelectedRunId("all", state.runs)).toBe("run-1");
+  });
+
+  test("renders an icon delete button with an accessible title in the history list", () => {
     const html = renderToStaticMarkup(
       <AnalysisView
         state={makeState([])}
@@ -194,7 +228,8 @@ describe("AnalysisView", () => {
       />,
     );
 
-    expect(html).toContain(">删除</span>");
+    expect(html).toContain('title="删除历史测试"');
+    expect(html).toContain("lucide-trash2");
   });
 
   test("renders an in-app delete confirmation prompt when a run is pending deletion", () => {
