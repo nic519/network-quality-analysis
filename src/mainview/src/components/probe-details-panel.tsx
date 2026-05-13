@@ -103,13 +103,12 @@ function ProbeTable({ rows }: { rows: ProbeRow[] }) {
 }
 
 function ProbeIpCell({ row }: { row: ProbeRow }) {
-  const [locationLine1, locationLine2] = formatProbeLocationLines(row);
+  const locationLine = formatProbeLocationLine(row);
 
   return (
     <div title={[row.probeIp, formatProbeLocationTitle(row)].filter(Boolean).join(" / ") || "N/A"}>
-      <div className="break-all text-sm leading-5 text-foreground">{row.probeIp || "N/A"}</div>
-      {locationLine1 ? <div className="mt-0.5 text-xs leading-4 text-muted-foreground">{locationLine1}</div> : null}
-      {locationLine2 ? <div className="text-xs leading-4 text-muted-foreground">{locationLine2}</div> : null}
+      <div className="truncate text-sm leading-5 text-foreground">{row.probeIp || "N/A"}</div>
+      {locationLine ? <div className="mt-0.5 truncate text-xs leading-4 text-muted-foreground">{locationLine}</div> : null}
     </div>
   );
 }
@@ -130,13 +129,10 @@ function ProbeAsnCell({ row }: { row: ProbeRow }) {
   );
 }
 
-function formatProbeLocationLines(row: ProbeRow) {
-  const line1 = [row.probeCountryCode, row.probeCountry].filter(Boolean).join(" / ");
-  const line2 = [row.probeRegion, row.probeCity].filter(Boolean).join(" / ");
-  return [line1, line2] as const;
+function formatProbeLocationLine(row: ProbeRow) {
+  return [row.probeCountryCode, row.probeCountry, row.probeRegion, row.probeCity].filter(Boolean).join(" / ");
 }
 
 function formatProbeLocationTitle(row: ProbeRow) {
-  const [line1, line2] = formatProbeLocationLines(row);
-  return [line1, line2].filter(Boolean).join(" / ") || "N/A";
+  return formatProbeLocationLine(row) || "N/A";
 }

@@ -151,12 +151,11 @@ describe("AnalysisView", () => {
       />,
     );
 
-    expect(html).toContain("US / United States");
-    expect(html).toContain("California / Los Angeles");
+    expect(html).toContain("US / United States / California / Los Angeles");
     expect(html).toContain("AS36352");
     expect(html).toContain("HostPapa");
-    expect(html).toContain('class="break-all text-sm leading-5 text-foreground"');
-    expect(html).toContain('class="text-xs leading-4 text-muted-foreground"');
+    expect(html).toContain('class="truncate text-sm leading-5 text-foreground"');
+    expect(html).toContain('class="mt-0.5 truncate text-xs leading-4 text-muted-foreground"');
   });
 
   test("renders probe location below the IP instead of using a separate location column", () => {
@@ -187,8 +186,7 @@ describe("AnalysisView", () => {
 
     expect(html).not.toContain(">地区</th>");
     expect(html).toContain("23.94.213.251");
-    expect(html).toContain("US / United States");
-    expect(html).toContain("California / Los Angeles");
+    expect(html).toContain("US / United States / California / Los Angeles");
   });
 
   test("renders every probe row without truncating the list", () => {
