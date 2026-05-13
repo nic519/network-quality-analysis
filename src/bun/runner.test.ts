@@ -36,6 +36,8 @@ describe("buildSpeedtestArgs", () => {
         "8s",
         "--latency-timeout",
         "8s",
+        "--proxy-concurrent",
+        "2",
         "--probe-url",
         DEFAULT_PROBE_SETTINGS.url,
         "--probe-method",
@@ -349,6 +351,39 @@ describe("runLatencyTest", () => {
     expect(calls).toHaveLength(2);
     expect(calls[0]).toContain("--probe-url");
     expect(calls[1]).not.toContain("--probe-url");
+  });
+
+  test("retries without proxy concurrency when the installed clash-speedtest is older", async () => {
+    const root = join(tmpdir(), `latency-runner-old-proxy-concurrent-${Date.now()}`);
+    const binaryPath = join(root, "clash-speedtest");
+    const configPath = join(root, "config.yaml");
+    mkdirSync(root, { recursive: true });
+    writeFileSync(binaryPath, "");
+    writeFileSync(configPath, "");
+    const calls: string[][] = [];
+
+    await runLatencyTest(
+      {
+        configPath,
+        regionIds: ["hong-kong"],
+      },
+      {
+        binaryPath,
+        sites: [site],
+        execute: async (_binary, args) => {
+          calls.push(args);
+          if (args.includes("--proxy-concurrent")) {
+            throw new Error("clash-speedtest exited with 2: flag provided but not defined: -proxy-concurrent");
+          }
+          return "序号\t节点名称\t类型\t延迟\n1.\tHK-01\tTrojan\t128ms\n";
+        },
+      },
+    );
+
+    expect(calls).toHaveLength(2);
+    expect(calls[0]).toContain("--proxy-concurrent");
+    expect(calls[1]).not.toContain("--proxy-concurrent");
+    expect(calls[1]).toContain("--probe-url");
   });
 
   test("streams clash-speedtest output into progress messages", async () => {

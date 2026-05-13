@@ -1,4 +1,5 @@
-import { AlertCircle, Circle, CircleDot, Copy, Gauge, Globe2, Search, ShieldCheck, Trophy } from "lucide-react";
+import { useState } from "react";
+import { AlertCircle, ArrowDownAZ, Circle, CircleDot, Copy, Gauge, Globe2, Search, ShieldCheck, Timer, Trophy } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
@@ -11,6 +12,8 @@ import { cn } from "../lib/utils";
 import { latencyToMs } from "../../../shared/domain";
 import type { SiteDefinition } from "../../../shared/domain";
 import type { AppState } from "../../../shared/rpc";
+
+type ProbeSortMode = "proxy-name" | "probe-latency";
 
 export function AnalysisView({
   state,
@@ -41,6 +44,7 @@ export function AnalysisView({
   error: string | null;
   onCopyResults: () => void;
 }) {
+  const [probeSortMode, setProbeSortMode] = useState<ProbeSortMode>("proxy-name");
   const selectableSites = buildSelectableSites(state.sites, state.results);
   const selectedSite = selectableSites.find((site) => site.id === selectedSiteId) ?? selectableSites[0];
   const runItems = state.runs.slice(0, 12);
@@ -48,7 +52,7 @@ export function AnalysisView({
   const chartRows = buildRunScopedChartRows(scopedResults, search, selectedSite?.name);
   const availableChartRows = chartRows.filter((row) => row.isAvailable);
   const failedSiteRows = buildFailedSiteRows(scopedResults, search);
-  const probeRows = buildProbeRows(scopedResults, search);
+  const probeRows = buildProbeRows(scopedResults, search, probeSortMode);
   const fastestRow = availableChartRows[0];
 
   return (
@@ -184,6 +188,28 @@ export function AnalysisView({
                       <Globe2 className="h-4 w-4 text-primary" />
                       <h2 className="text-sm font-semibold text-foreground">出口信息</h2>
                       <span className="text-xs text-muted-foreground">按节点 ID 合并展示 probe 结果</span>
+                      <div className="ml-auto flex items-center gap-1">
+                        <Button
+                          type="button"
+                          variant={probeSortMode === "proxy-name" ? "default" : "outline"}
+                          className="h-7 rounded-md px-2 text-xs"
+                          title="按节点名称排序"
+                          onClick={() => setProbeSortMode("proxy-name")}
+                        >
+                          <ArrowDownAZ className="h-3.5 w-3.5" />
+                          节点名称
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={probeSortMode === "probe-latency" ? "default" : "outline"}
+                          className="h-7 rounded-md px-2 text-xs"
+                          title="按响应时间排序"
+                          onClick={() => setProbeSortMode("probe-latency")}
+                        >
+                          <Timer className="h-3.5 w-3.5" />
+                          响应时间
+                        </Button>
+                      </div>
                     </div>
                     <ProbeTable rows={probeRows} />
                   </section>
@@ -326,7 +352,7 @@ function ProbeTable({ rows }: { rows: ReturnType<typeof buildProbeRows> }) {
           </TableRow>
         </TableHeader>
         <TableBody className="[&_tr:last-child]:border-0">
-          {rows.slice(0, 12).map((row) => (
+          {rows.map((row) => (
             <TableRow key={row.key} className="border-border hover:bg-accent/35">
               <TableCell className="max-w-[260px] px-3 py-2">
                 <div className="truncate text-sm font-medium text-foreground" title={row.proxyName}>
@@ -426,7 +452,7 @@ function FailureTable({ rows }: { rows: ReturnType<typeof buildFailedSiteRows> }
   );
 }
 
-function buildProbeRows(results: AppState["results"], search: string) {
+export function buildProbeRows(results: AppState["results"], search: string, sortMode: ProbeSortMode = "proxy-name") {
   const normalizedSearch = search.trim().toLowerCase();
   const rows = new Map<string, {
     key: string;
@@ -454,7 +480,7 @@ function buildProbeRows(results: AppState["results"], search: string) {
     rows.set(result.proxyId, nextRow);
   }
 
-  return [...rows.values()].sort((a, b) => a.proxyName.localeCompare(b.proxyName, "zh-CN"));
+  return [...rows.values()].sort((a, b) => compareProbeRows(a, b, sortMode));
 }
 
 function makeProbeRow(result: AppState["results"][number]) {
@@ -481,6 +507,22 @@ function probeResultScore(row: ReturnType<typeof makeProbeRow>) {
   if (row.probeStatus && !row.probeError) return 2;
   if (row.probeStatus) return 1;
   return 0;
+}
+
+function compareProbeRows(left: ReturnType<typeof makeProbeRow>, right: ReturnType<typeof makeProbeRow>, sortMode: ProbeSortMode) {
+  if (sortMode === "probe-latency") {
+    const leftFailed = Boolean(left.probeError);
+    const rightFailed = Boolean(right.probeError);
+    if (leftFailed !== rightFailed) return leftFailed ? 1 : -1;
+
+    const leftLatency = latencyToMs(left.probeLatency);
+    const rightLatency = latencyToMs(right.probeLatency);
+    if (leftLatency !== null && rightLatency !== null && leftLatency !== rightLatency) return leftLatency - rightLatency;
+    if (leftLatency !== null && rightLatency === null) return -1;
+    if (leftLatency === null && rightLatency !== null) return 1;
+  }
+
+  return left.proxyName.localeCompare(right.proxyName, "zh-CN");
 }
 
 function formatProbeLocationLines(row: ReturnType<typeof buildProbeRows>[number]) {

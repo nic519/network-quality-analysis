@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { AnalysisView } from "./analysis-view";
+import { AnalysisView, buildProbeRows } from "./analysis-view";
 import type { AppState } from "../../../shared/rpc";
 import { DEFAULT_PROBE_SETTINGS } from "../../../shared/probe-settings";
 import { DEFAULT_SITES, REGION_PRESETS, type ResultRow } from "../../../shared/domain";
@@ -122,6 +122,94 @@ describe("AnalysisView", () => {
     expect(html).toContain("HostPapa");
     expect(html).toContain('class="text-sm leading-5 text-muted-foreground"');
     expect(html).toContain('class="text-xs leading-4 text-muted-foreground"');
+  });
+
+  test("renders every probe row without truncating the list", () => {
+    const rows = Array.from({ length: 13 }, (_, index) =>
+      makeResult({
+        proxyId: `proxy-hk-${String(index + 1).padStart(2, "0")}`,
+        proxyName: `HK-${String(index + 1).padStart(2, "0")}`,
+        probeIp: `203.0.113.${index + 1}`,
+        probeStatus: "200",
+        probeLatency: `${100 + index}ms`,
+      }),
+    );
+
+    const html = renderToStaticMarkup(
+      <AnalysisView
+        state={makeState(rows)}
+        selectedRunId="run-1"
+        onSelectedRunIdChange={() => {}}
+        fromDate="2026-05-13"
+        toDate="2026-05-13"
+        onFromDateChange={() => {}}
+        onToDateChange={() => {}}
+        search=""
+        onSearchChange={() => {}}
+        selectedSiteId="youtube"
+        onSelectedSiteIdChange={() => {}}
+        error={null}
+        onCopyResults={() => {}}
+      />,
+    );
+
+    expect(html).toContain("HK-01");
+    expect(html).toContain("HK-13");
+  });
+
+  test("sorts probe rows by response time with unavailable latencies last", () => {
+    const rows = buildProbeRows(
+      [
+        makeResult({
+          proxyId: "proxy-slow",
+          proxyName: "HK Slow",
+          probeStatus: "200",
+          probeLatency: "450ms",
+        }),
+        makeResult({
+          proxyId: "proxy-missing",
+          proxyName: "HK Missing",
+          probeStatus: "200",
+          probeLatency: "",
+        }),
+        makeResult({
+          proxyId: "proxy-fast",
+          proxyName: "HK Fast",
+          probeStatus: "200",
+          probeLatency: "82ms",
+        }),
+      ],
+      "",
+      "probe-latency",
+    );
+
+    expect(rows.map((row) => row.proxyName)).toEqual(["HK Fast", "HK Slow", "HK Missing"]);
+  });
+
+  test("keeps failed probe rows after successful rows when sorting by response time", () => {
+    const rows = buildProbeRows(
+      [
+        makeResult({
+          proxyId: "proxy-failed-fast",
+          proxyName: "IPv6 Failed",
+          latency: "N/A",
+          probeLatency: "0ms",
+          probeError:
+            'probe request failed: Get "https://api.ip.sb/geoip/": [2401:b60:e0ce:20::1]:8080 connect error: dns resolve failed: ip version error',
+        }),
+        makeResult({
+          proxyId: "proxy-success",
+          proxyName: "HK Success",
+          probeIp: "203.0.113.10",
+          probeStatus: "200",
+          probeLatency: "120ms",
+        }),
+      ],
+      "",
+      "probe-latency",
+    );
+
+    expect(rows.map((row) => row.proxyName)).toEqual(["HK Success", "IPv6 Failed"]);
   });
 });
 

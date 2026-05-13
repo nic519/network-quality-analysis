@@ -13,6 +13,8 @@ import {
 } from "../shared/domain";
 import { DEFAULT_PROBE_SETTINGS, normalizeProbeSettings, type ProbeSettings } from "../shared/probe-settings";
 
+const DEFAULT_PROXY_CONCURRENT = "2";
+
 export type RunRequest = {
   configPath: string;
   regionIds: RegionPreset["id"][];
@@ -59,6 +61,8 @@ export function buildSpeedtestArgs(
     "8s",
     "--latency-timeout",
     "8s",
+    "--proxy-concurrent",
+    DEFAULT_PROXY_CONCURRENT,
   ];
 
   if (normalizedProbeSettings.enabled && options.includeProbe !== false) {
@@ -110,7 +114,7 @@ export async function runLatencyTest(request: RunRequest, options: RunnerOptions
           includeProbe: includeProbeForRegion,
         });
         options.onProgress?.(`运行 ${formatSpeedtestCommand(args)}`);
-        const raw = await executeWithProbeFallback(binaryPath, args, execute, options);
+        const raw = await executeWithOptionalFlagFallback(binaryPath, args, execute, options);
         const rows = normalizeSpeedtestRows(raw, activeRun.id, region, site);
         results.push(...rows);
         includeProbeForRegion = false;
@@ -133,40 +137,60 @@ export async function runLatencyTest(request: RunRequest, options: RunnerOptions
   }
 }
 
-async function executeWithProbeFallback(
+async function executeWithOptionalFlagFallback(
   binaryPath: string,
   args: string[],
   execute: NonNullable<RunnerOptions["execute"]>,
   options: RunnerOptions,
 ) {
-  try {
-    return await execute(binaryPath, args, { onProgress: options.onProgress });
-  } catch (error) {
-    if (!isUnsupportedProbeFlagError(error)) throw error;
-    const fallbackArgs = stripProbeArgs(args);
-    options.onProgress?.("当前 clash-speedtest 不支持 probe 参数，已降级为仅测速模式。");
-    options.onProgress?.(`运行 ${formatSpeedtestCommand(fallbackArgs)}`);
-    return execute(binaryPath, fallbackArgs, { onProgress: options.onProgress });
+  let currentArgs = args;
+  const appliedFallbacks = new Set<OptionalFlagFallback>();
+
+  while (true) {
+    try {
+      return await execute(binaryPath, currentArgs, { onProgress: options.onProgress });
+    } catch (error) {
+      const fallback = getUnsupportedOptionalFlagFallback(error);
+      if (!fallback || appliedFallbacks.has(fallback)) throw error;
+
+      appliedFallbacks.add(fallback);
+      currentArgs = stripOptionalArgs(currentArgs, fallback);
+      options.onProgress?.(describeOptionalFlagFallback(fallback));
+      options.onProgress?.(`运行 ${formatSpeedtestCommand(currentArgs)}`);
+    }
   }
 }
 
-function isUnsupportedProbeFlagError(error: unknown) {
+type OptionalFlagFallback = "probe" | "proxy-concurrent";
+
+function getUnsupportedOptionalFlagFallback(error: unknown): OptionalFlagFallback | null {
   const message = error instanceof Error ? error.message : String(error);
-  return message.includes("flag provided but not defined") && message.includes("probe");
+  if (!message.includes("flag provided but not defined")) return null;
+  if (message.includes("probe")) return "probe";
+  if (message.includes("proxy-concurrent")) return "proxy-concurrent";
+  return null;
 }
 
-function stripProbeArgs(args: string[]) {
-  const probeFlags = new Set(["--probe-url", "--probe-method", "--probe-timeout", "--probe-fields"]);
+function stripOptionalArgs(args: string[], fallback: OptionalFlagFallback) {
+  const flags =
+    fallback === "probe"
+      ? new Set(["--probe-url", "--probe-method", "--probe-timeout", "--probe-fields"])
+      : new Set(["--proxy-concurrent"]);
   const stripped: string[] = [];
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
-    if (probeFlags.has(arg)) {
+    if (flags.has(arg)) {
       index += 1;
       continue;
     }
     stripped.push(arg);
   }
   return stripped;
+}
+
+function describeOptionalFlagFallback(fallback: OptionalFlagFallback) {
+  if (fallback === "probe") return "当前 clash-speedtest 不支持 probe 参数，已降级为仅测速模式。";
+  return "当前 clash-speedtest 不支持节点并发参数，已降级为串行节点测速。";
 }
 
 export function validateRunnableInputs(binaryPath: string, configPath: string) {
