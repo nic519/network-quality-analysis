@@ -85,6 +85,38 @@ describe("RunSetupView", () => {
     expect(html).toContain("custom-scrollbar flex min-w-0 flex-nowrap gap-2 overflow-x-auto overflow-y-hidden pb-1");
   });
 
+  test("summary cards stay shrinkable and wrap their header metadata", () => {
+    const html = renderToStaticMarkup(
+      <RunSetupView
+        state={state}
+        configPath="https://example.com/config.yaml"
+        onConfigPathChange={() => {}}
+        onSelectConfigFile={() => {}}
+        recentConfigPaths={[]}
+        selectedRegionIds={["hong-kong"]}
+        onToggleRegion={() => {}}
+        configInspection={null}
+        isInspectingConfig={false}
+        selectedSiteIds={["youtube", "github"]}
+        onToggleSite={() => {}}
+        progress="准备开始"
+        runProgress={null}
+        progressLog={[]}
+        error={null}
+        onStartRun={() => {}}
+        isPending={false}
+        diagnosticsHint="clash-speedtest 版本不匹配：需要 >= 1.9.0，当前是 dev。请重新编译或安装对应版本。"
+        onOpenDiagnostics={() => {}}
+      />,
+    );
+
+    expect(html).toContain("py-6 xl:grid-cols-[minmax(0,0.98fr)_minmax(0,0.82fr)]");
+    expect(html).toContain("mb-4 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between");
+    expect(html).toContain("max-w-full self-start whitespace-normal border-primary/30 bg-primary/10 text-primary");
+    expect(html).toContain("flex min-w-0 flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-3");
+    expect(html).toContain("max-w-full self-start whitespace-normal sm:shrink-0");
+  });
+
   test("renders a group progress bar and node estimate while a run is active", () => {
     const html = renderToStaticMarkup(
       <RunSetupView

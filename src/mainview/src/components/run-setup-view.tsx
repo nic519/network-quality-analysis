@@ -71,7 +71,7 @@ export function RunSetupView({
           </Badge>
         </header>
 
-        <div className="grid gap-6 py-6 lg:grid-cols-[minmax(0,0.98fr)_minmax(360px,0.82fr)]">
+        <div className="grid gap-6 py-6 xl:grid-cols-[minmax(0,0.98fr)_minmax(0,0.82fr)]">
           <section className="grid content-start gap-5">
             <div className="grid gap-3">
               <StepHeading number="1" title="选择配置" description="支持本地 yaml 文件路径，或 Clash/Mihomo 订阅 URL。" />
@@ -144,14 +144,14 @@ export function RunSetupView({
             </div>
           </section>
 
-          <aside className="grid content-start gap-4">
-            <section className="rounded-md border border-border bg-card px-4 py-4">
-              <div className="mb-4 flex items-start justify-between gap-3">
-                <div>
+          <aside className="grid min-w-0 content-start gap-4">
+            <section className="min-w-0 rounded-md border border-border bg-card px-4 py-4">
+              <div className="mb-4 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
                   <h2 className="text-sm font-semibold text-foreground">执行预览</h2>
                   <p className="mt-1 text-xs leading-5 text-muted-foreground">这里展示点击开始后，工具实际会做的事情。</p>
                 </div>
-                <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
+                <Badge variant="outline" className="max-w-full self-start whitespace-normal border-primary/30 bg-primary/10 text-primary">
                   {selectedRegions.length} 地区 × {selectedSites.length} 网站
                 </Badge>
               </div>
@@ -183,10 +183,10 @@ export function RunSetupView({
                 <PreviewRow icon={TerminalSquare} title="输出结果" body="记录每个节点的延迟和失败情况，再按当前网站给出最快节点。" />
               </div>
 
-              <div className="mt-4 rounded-md border border-border bg-secondary/35 px-3 py-3">
-                <div className="flex items-center justify-between gap-3 text-sm">
+              <div className="mt-4 min-w-0 rounded-md border border-border bg-secondary/35 px-3 py-3">
+                <div className="flex min-w-0 flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                   <span className="font-medium text-foreground">本次测试规模</span>
-                  <span className="text-muted-foreground">{testGroupCount} 组 clash-speedtest 调用</span>
+                  <span className="min-w-0 break-words text-muted-foreground">{testGroupCount} 组 clash-speedtest 调用</span>
                 </div>
                 <div className="mt-2 text-xs leading-5 text-muted-foreground">
                   每组测试都会使用同一份配置，通过一个地区筛选规则访问一个目标 URL。
@@ -194,7 +194,7 @@ export function RunSetupView({
               </div>
             </section>
 
-            <section className="rounded-md border border-border bg-card px-4 py-4">
+            <section className="min-w-0 rounded-md border border-border bg-card px-4 py-4">
               <h2 className="text-sm font-semibold text-foreground">节点匹配规则</h2>
               <div className="mt-3 grid gap-3">
                 {selectedRegions.length ? (
@@ -222,16 +222,16 @@ export function RunSetupView({
               </div>
             </section>
 
-            <section className="rounded-md border border-border bg-card px-4 py-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
+            <section className="min-w-0 rounded-md border border-border bg-card px-4 py-4">
+              <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
                   <h2 className="text-sm font-semibold text-foreground">准备状态</h2>
-                  <p className="mt-1 text-xs text-muted-foreground">{getDiagnosticsSummary(state.clashSpeedtest)}</p>
+                  <p className="mt-1 break-words text-xs text-muted-foreground">{getDiagnosticsSummary(state.clashSpeedtest)}</p>
                 </div>
                 <Badge
                   variant="outline"
                   className={cn(
-                    "shrink-0",
+                    "max-w-full self-start whitespace-normal sm:shrink-0",
                     state.clashSpeedtest.status === "ready"
                       ? "border-primary/30 bg-primary/10 text-primary"
                       : "border-border bg-muted text-muted-foreground",
