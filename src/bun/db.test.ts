@@ -49,6 +49,42 @@ describe("LatencyDatabase", () => {
     db.close();
   });
 
+  test("stores probe fields with each result row", () => {
+    const db = new LatencyDatabase();
+    db.migrate();
+
+    db.saveRun(makeRun("run-1", "2026-05-07T10:00:00.000Z"));
+    db.saveResults([
+      {
+        ...makeResult("run-1", "hong-kong", "YouTube", "128ms"),
+        probeUrl: "https://ipapi.co/json/",
+        probeLatency: "82ms",
+        probeStatus: "200",
+        probeError: "",
+        probeIp: "203.0.113.10",
+        probeCountry: "Japan",
+        probeCountryCode: "JP",
+        probeRegion: "Tokyo",
+        probeCity: "Tokyo",
+        probeAsn: "AS64500",
+        probeOrg: "Example Transit",
+      },
+    ]);
+
+    expect(db.queryResults({ runId: "run-1" })[0]).toMatchObject({
+      probeUrl: "https://ipapi.co/json/",
+      probeLatency: "82ms",
+      probeStatus: "200",
+      probeIp: "203.0.113.10",
+      probeCountry: "Japan",
+      probeCountryCode: "JP",
+      probeAsn: "AS64500",
+      probeOrg: "Example Transit",
+    });
+
+    db.close();
+  });
+
   test("stores recent config paths by latest successful run", () => {
     const db = new LatencyDatabase();
     db.migrate();
@@ -107,5 +143,16 @@ function makeResult(
     packetLoss: "N/A",
     downloadSpeed: "N/A",
     uploadSpeed: "N/A",
+    probeUrl: "",
+    probeLatency: "",
+    probeStatus: "",
+    probeError: "",
+    probeIp: "",
+    probeCountry: "",
+    probeCountryCode: "",
+    probeRegion: "",
+    probeCity: "",
+    probeAsn: "",
+    probeOrg: "",
   };
 }

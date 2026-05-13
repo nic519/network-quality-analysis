@@ -1,11 +1,13 @@
 import { Electroview } from "electrobun/view";
 import { DEFAULT_SITES, REGION_PRESETS, type HistoryFilters, type RegionPreset } from "../../../shared/domain";
+import { DEFAULT_PROBE_SETTINGS } from "../../../shared/probe-settings";
 import { APP_RPC_TIMEOUT_MS, type AppRPC } from "../../../shared/rpc";
 import type {
   AppState,
   ClashSpeedtestState,
   ExportCsvResponse,
   ResetClashSpeedtestBinaryPathResponse,
+  SetProbeSettingsParams,
   SetClashSpeedtestBinaryPathParams,
   SetTestSitesParams,
   StartRunParams,
@@ -50,6 +52,7 @@ function createPreviewApi() {
   const sample: AppState = {
     regions: REGION_PRESETS,
     sites: DEFAULT_SITES,
+    probeSettings: DEFAULT_PROBE_SETTINGS,
     configHistory: [
       {
         path: "/Users/nicholas/Library/Application Support/mihomo-party/profiles/config.yaml",
@@ -132,6 +135,11 @@ function createPreviewApi() {
       progressHandler?.(`浏览器预览模式：已保存 ${sites.length} 个测试网站，其中 ${enabledSiteCount} 个已启用`);
       sample.sites = sites;
       return sites;
+    },
+    setProbeSettings: async ({ settings }: SetProbeSettingsParams) => {
+      progressHandler?.(`浏览器预览模式：已保存 Probe API ${settings.url}`);
+      sample.probeSettings = settings;
+      return settings;
     },
     openExternalUrl: async ({ url }: { url: string }) => {
       window.open(url, "_blank", "noopener,noreferrer");

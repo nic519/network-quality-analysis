@@ -75,12 +75,38 @@ describe("getClashSpeedtestState", () => {
         platform: "darwin",
         arch: "arm64",
         now: () => new Date("2026-05-07T00:00:00.000Z"),
+        readVersion: async () => "clash-speedtest version 0.1.3 (commit abc123)",
       }),
     ).resolves.toMatchObject({
       status: "ready",
+      version: "0.1.3",
       path: binaryPath,
       source: "go-install",
       message: "已检测到 clash-speedtest，可直接运行",
+    });
+  });
+
+  test("requires the bundled clash-speedtest version", async () => {
+    const root = join(tmpdir(), `latency-compass-wrong-version-${Date.now()}`);
+    const binaryPath = join(root, "clash-speedtest");
+    mkdirSync(root, { recursive: true });
+    writeFileSync(binaryPath, "");
+    chmodSync(binaryPath, 0o755);
+
+    await expect(
+      getClashSpeedtestState({
+        gobin: root,
+        platform: "darwin",
+        arch: "arm64",
+        now: () => new Date("2026-05-07T00:00:00.000Z"),
+        readVersion: async () => "clash-speedtest version 0.1.2 (commit abc123)",
+      }),
+    ).resolves.toMatchObject({
+      status: "error",
+      version: "0.1.2",
+      path: binaryPath,
+      source: "go-install",
+      message: "clash-speedtest 版本不匹配：需要 0.1.3，当前是 0.1.2。请重新编译或安装对应版本。",
     });
   });
 });

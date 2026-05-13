@@ -1,9 +1,11 @@
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import packageJson from "../../package.json";
 import type { ClashSpeedtestState } from "../shared/rpc";
 
 const GO_INSTALL_COMMAND = "go install github.com/nic519/clash-speedtest@latest";
+export const REQUIRED_CLASH_SPEEDTEST_VERSION = packageJson.version;
 
 export type ResolveClashSpeedtestOptions = {
   platform?: NodeJS.Platform;
@@ -18,6 +20,7 @@ export type ClashSpeedtestStatusOptions = Pick<
   "platform" | "arch" | "envPath" | "gobin" | "goPath"
 > & {
   now?: () => Date;
+  readVersion?: (binaryPath: string) => Promise<string>;
 };
 
 type LocalClashSpeedtestInstall = {
@@ -36,13 +39,83 @@ export async function resolveClashSpeedtestPath(options: ResolveClashSpeedtestOp
 export async function getClashSpeedtestState(options: ClashSpeedtestStatusOptions = {}): Promise<ClashSpeedtestState> {
   const now = options.now ?? (() => new Date());
   const local = getLocalClashSpeedtestInstall(options);
-  return makeClashSpeedtestState({
-    status: local.path ? "ready" : "missing",
-    version: null,
-    path: local.path,
-    source: local.source,
-    checkedAt: now().toISOString(),
+  if (!local.path) {
+    return makeClashSpeedtestState({
+      status: "missing",
+      version: null,
+      path: local.path,
+      source: local.source,
+      checkedAt: now().toISOString(),
+    });
+  }
+
+  const readVersion = options.readVersion ?? readClashSpeedtestVersion;
+  try {
+    const versionOutput = await readVersion(local.path);
+    const version = parseClashSpeedtestVersion(versionOutput);
+    if (version !== REQUIRED_CLASH_SPEEDTEST_VERSION) {
+      return makeClashSpeedtestState({
+        status: "error",
+        version,
+        path: local.path,
+        source: local.source,
+        checkedAt: now().toISOString(),
+        message: `clash-speedtest 版本不匹配：需要 ${REQUIRED_CLASH_SPEEDTEST_VERSION}，当前是 ${version || "未知"}。请重新编译或安装对应版本。`,
+      });
+    }
+
+    return makeClashSpeedtestState({
+      status: "ready",
+      version,
+      path: local.path,
+      source: local.source,
+      checkedAt: now().toISOString(),
+    });
+  } catch (error) {
+    return makeClashSpeedtestState({
+      status: "error",
+      version: null,
+      path: local.path,
+      source: local.source,
+      checkedAt: now().toISOString(),
+      message: `无法读取 clash-speedtest 版本。请重新编译或安装 ${REQUIRED_CLASH_SPEEDTEST_VERSION} 版本。${toErrorMessage(error)}`,
+    });
+  }
+}
+
+export function parseClashSpeedtestVersion(output: string) {
+  const match = output.match(/clash-speedtest version\s+([^\s]+)/i);
+  return match?.[1] ?? "";
+}
+
+async function readClashSpeedtestVersion(binaryPath: string) {
+  const proc = Bun.spawn([binaryPath, "-v"], {
+    stdout: "pipe",
+    stderr: "pipe",
   });
+  const [stdout, stderr, exitCode] = await Promise.all([readText(proc.stdout), readText(proc.stderr), proc.exited]);
+  const combined = [stdout, stderr].filter(Boolean).join("\n").trim();
+  if (exitCode !== 0) {
+    throw new Error(`版本检查失败：${combined || `退出码 ${exitCode}`}`);
+  }
+  return combined;
+}
+
+async function readText(stream: ReadableStream<Uint8Array>) {
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  let output = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    output += decoder.decode(value, { stream: true });
+  }
+  output += decoder.decode();
+  return output;
+}
+
+function toErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
 }
 
 export function getLocalClashSpeedtestInstall(options: ClashSpeedtestStatusOptions = {}): LocalClashSpeedtestInstall {

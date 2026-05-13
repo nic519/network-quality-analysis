@@ -30,7 +30,28 @@ describe("buildSpeedtestArgs", () => {
       "https://www.youtube.com/generate_204",
       "-timeout",
       "8s",
+      "--probe-url",
+      "https://api.ip.sb/geoip/",
+      "--probe-method",
+      "GET",
+      "--probe-timeout",
+      "8s",
+      "--probe-fields",
+      "ip=ip,country=country,country_code=country_code,region=region,city=city,asn=asn,org=organization",
     ]);
+  });
+
+  test("uses configured probe settings when building args", () => {
+    expect(
+      buildSpeedtestArgs("config.yaml", REGION_PRESETS[0], site, {
+        url: "https://example.com/probe",
+        fields: "ip=query,country=country",
+        timeout: "12s",
+      }),
+    ).toContain("https://example.com/probe");
+    expect(buildSpeedtestArgs("config.yaml", REGION_PRESETS[0], site, { url: "https://example.com/probe", fields: "ip=query", timeout: "12s" })).toEqual(
+      expect.arrayContaining(["--probe-timeout", "12s", "--probe-fields", "ip=query"]),
+    );
   });
 });
 
@@ -55,6 +76,17 @@ describe("normalizeSpeedtestRows", () => {
         packetLoss: "N/A",
         downloadSpeed: "N/A",
         uploadSpeed: "N/A",
+        probeUrl: "",
+        probeLatency: "",
+        probeStatus: "",
+        probeError: "",
+        probeIp: "",
+        probeCountry: "",
+        probeCountryCode: "",
+        probeRegion: "",
+        probeCity: "",
+        probeAsn: "",
+        probeOrg: "",
       },
     ]);
   });
@@ -77,6 +109,11 @@ describe("runLatencyTest", () => {
       {
         binaryPath,
         sites: [site],
+        probeSettings: {
+          url: "https://example.com/probe",
+          fields: "ip=query",
+          timeout: "12s",
+        },
         now: () => new Date("2026-05-07T10:00:00.000Z"),
         execute: async (_binary, args) => {
           calls.push(args);
@@ -85,7 +122,15 @@ describe("runLatencyTest", () => {
       },
     );
 
-    expect(calls).toEqual([buildSpeedtestArgs(configPath, REGION_PRESETS[0], site)]);
+    expect(calls).toEqual([
+      buildSpeedtestArgs(configPath, REGION_PRESETS[0], site, {
+        url: "https://example.com/probe",
+        fields: "ip=query",
+        timeout: "12s",
+      }),
+    ]);
+    expect(calls[0]).toContain("--probe-url");
+    expect(calls[0]).toContain("https://example.com/probe");
     expect(output.run.status).toBe("completed");
     expect(output.results).toHaveLength(1);
   });
@@ -218,6 +263,38 @@ describe("runLatencyTest", () => {
     expect(messages.some((message) => message.includes("clash-speedtest -c") && message.includes("-timeout 8s"))).toBe(
       true,
     );
+  });
+
+  test("retries without probe flags when the installed clash-speedtest is older", async () => {
+    const root = join(tmpdir(), `latency-runner-old-probe-${Date.now()}`);
+    const binaryPath = join(root, "clash-speedtest");
+    const configPath = join(root, "config.yaml");
+    mkdirSync(root, { recursive: true });
+    writeFileSync(binaryPath, "");
+    writeFileSync(configPath, "");
+    const calls: string[][] = [];
+
+    await runLatencyTest(
+      {
+        configPath,
+        regionIds: ["hong-kong"],
+      },
+      {
+        binaryPath,
+        sites: [site],
+        execute: async (_binary, args) => {
+          calls.push(args);
+          if (args.includes("--probe-url")) {
+            throw new Error("clash-speedtest exited with 2: flag provided but not defined: -probe-url");
+          }
+          return "序号\t节点名称\t类型\t延迟\n1.\tHK-01\tTrojan\t128ms\n";
+        },
+      },
+    );
+
+    expect(calls).toHaveLength(2);
+    expect(calls[0]).toContain("--probe-url");
+    expect(calls[1]).not.toContain("--probe-url");
   });
 
   test("streams clash-speedtest output into progress messages", async () => {

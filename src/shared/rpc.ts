@@ -1,5 +1,6 @@
 import type { RPCSchema } from "electrobun/bun";
 import type { HistoryFilters, RegionPreset, ResultRow, RunRecord, SiteDefinition } from "./domain";
+import type { ProbeSettings } from "./probe-settings";
 
 // 应用层 RPC 的统一超时时间，覆盖测速、导出等耗时操作。
 export const APP_RPC_TIMEOUT_MS = 10 * 60 * 1000;
@@ -10,6 +11,8 @@ export type AppState = {
   regions: RegionPreset[];
   // 当前参与测速的网站定义列表。
   sites: SiteDefinition[];
+  // 当前用于节点出口探测的 probe API 配置。
+  probeSettings: ProbeSettings;
   // 历史测速任务记录。
   runs: RunRecord[];
   // 历史测速结果明细。
@@ -80,6 +83,10 @@ export type SetTestSitesParams = {
   sites: SiteDefinition[];
 };
 
+export type SetProbeSettingsParams = {
+  settings: ProbeSettings;
+};
+
 // 重置自定义二进制路径后的返回结果。
 export type ResetClashSpeedtestBinaryPathResponse = {
   // 是否真的清除了已有配置。
@@ -113,6 +120,8 @@ export type AppRPC = {
       resetClashSpeedtestBinaryPath: { params: undefined; response: ResetClashSpeedtestBinaryPathResponse };
       // 保存测速站点配置，并返回最新站点列表。
       setTestSites: { params: SetTestSitesParams; response: SiteDefinition[] };
+      // 保存节点出口 probe API 配置，并返回规范化后的配置。
+      setProbeSettings: { params: SetProbeSettingsParams; response: ProbeSettings };
       // 让宿主环境在外部浏览器中打开指定链接。
       openExternalUrl: { params: OpenExternalUrlParams; response: null };
       // 根据配置文件和地区列表启动一次完整测速，并返回刷新后的应用状态。

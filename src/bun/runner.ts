@@ -11,6 +11,7 @@ import {
   type RunRecord,
   type SiteDefinition,
 } from "../shared/domain";
+import { DEFAULT_PROBE_SETTINGS, normalizeProbeSettings, type ProbeSettings } from "../shared/probe-settings";
 
 export type RunRequest = {
   configPath: string;
@@ -24,6 +25,7 @@ export type RunnerOptions = {
   now?: () => Date;
   execute?: (binaryPath: string, args: string[], options?: ExecuteSpeedtestOptions) => Promise<string>;
   onProgress?: (message: string) => void;
+  probeSettings?: ProbeSettings;
 };
 
 export type RunOutput = {
@@ -36,7 +38,13 @@ export type ExecuteSpeedtestOptions = {
   onProgress?: (message: string) => void;
 };
 
-export function buildSpeedtestArgs(configPath: string, region: RegionPreset, site: SiteDefinition): string[] {
+export function buildSpeedtestArgs(
+  configPath: string,
+  region: RegionPreset,
+  site: SiteDefinition,
+  probeSettings: ProbeSettings = DEFAULT_PROBE_SETTINGS,
+): string[] {
+  const normalizedProbeSettings = normalizeProbeSettings(probeSettings);
   return [
     "-c",
     configPath,
@@ -48,6 +56,14 @@ export function buildSpeedtestArgs(configPath: string, region: RegionPreset, sit
     site.url,
     "-timeout",
     "8s",
+    "--probe-url",
+    normalizedProbeSettings.url,
+    "--probe-method",
+    "GET",
+    "--probe-timeout",
+    normalizedProbeSettings.timeout,
+    "--probe-fields",
+    normalizedProbeSettings.fields,
   ];
 }
 
@@ -79,9 +95,9 @@ export async function runLatencyTest(request: RunRequest, options: RunnerOptions
 
       for (const site of sites) {
         options.onProgress?.(`测试 ${region.label} -> ${site.name}`);
-        const args = buildSpeedtestArgs(configPath, region, site);
+        const args = buildSpeedtestArgs(configPath, region, site, options.probeSettings);
         options.onProgress?.(`运行 ${formatSpeedtestCommand(args)}`);
-        const raw = await execute(binaryPath, args, { onProgress: options.onProgress });
+        const raw = await executeWithProbeFallback(binaryPath, args, execute, options);
         const rows = normalizeSpeedtestRows(raw, activeRun.id, region, site);
         results.push(...rows);
       }
@@ -101,6 +117,42 @@ export async function runLatencyTest(request: RunRequest, options: RunnerOptions
     const run = activeRun ?? runs[0] ?? createEmptyRun(now(), request.regionIds);
     throw Object.assign(error instanceof Error ? error : new Error(String(error)), { run, runs, results });
   }
+}
+
+async function executeWithProbeFallback(
+  binaryPath: string,
+  args: string[],
+  execute: NonNullable<RunnerOptions["execute"]>,
+  options: RunnerOptions,
+) {
+  try {
+    return await execute(binaryPath, args, { onProgress: options.onProgress });
+  } catch (error) {
+    if (!isUnsupportedProbeFlagError(error)) throw error;
+    const fallbackArgs = stripProbeArgs(args);
+    options.onProgress?.("当前 clash-speedtest 不支持 probe 参数，已降级为仅测速模式。");
+    options.onProgress?.(`运行 ${formatSpeedtestCommand(fallbackArgs)}`);
+    return execute(binaryPath, fallbackArgs, { onProgress: options.onProgress });
+  }
+}
+
+function isUnsupportedProbeFlagError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes("flag provided but not defined") && message.includes("probe");
+}
+
+function stripProbeArgs(args: string[]) {
+  const probeFlags = new Set(["--probe-url", "--probe-method", "--probe-timeout", "--probe-fields"]);
+  const stripped: string[] = [];
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (probeFlags.has(arg)) {
+      index += 1;
+      continue;
+    }
+    stripped.push(arg);
+  }
+  return stripped;
 }
 
 export function validateRunnableInputs(binaryPath: string, configPath: string) {

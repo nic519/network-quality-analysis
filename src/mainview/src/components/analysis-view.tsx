@@ -1,4 +1,4 @@
-import { AlertCircle, Circle, CircleDot, Copy, Gauge, Search, ShieldCheck, Trophy } from "lucide-react";
+import { AlertCircle, Circle, CircleDot, Copy, Gauge, Globe2, Search, ShieldCheck, Trophy } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
@@ -49,6 +49,7 @@ export function AnalysisView({
   const availableChartRows = chartRows.filter((row) => row.isAvailable);
   const recommendedRows = availableChartRows.slice(0, 3);
   const failedSiteRows = buildFailedSiteRows(scopedResults, search);
+  const probeRows = buildProbeRows(scopedResults, search);
   const fastestRow = recommendedRows[0];
 
   return (
@@ -178,6 +179,16 @@ export function AnalysisView({
                     detail={failedSiteRows.length ? "下方失败记录可查看网站" : "当前范围没有失败记录"}
                   />
                 </div>
+                {probeRows.length ? (
+                  <section className="mb-5">
+                    <div className="mb-3 flex items-center gap-2">
+                      <Globe2 className="h-4 w-4 text-primary" />
+                      <h2 className="text-sm font-semibold text-foreground">出口信息</h2>
+                      <span className="text-xs text-muted-foreground">按节点 ID 合并展示 probe 结果</span>
+                    </div>
+                    <ProbeTable rows={probeRows} />
+                  </section>
+                ) : null}
                 {recommendedRows.length ? (
                   <div className="grid gap-2 lg:grid-cols-3">
                     {recommendedRows.map((row, index) => (
@@ -326,6 +337,51 @@ function SummaryTile({
   );
 }
 
+function ProbeTable({ rows }: { rows: ReturnType<typeof buildProbeRows> }) {
+  return (
+    <div className="rounded-md border border-border bg-card/45">
+      <Table>
+        <TableHeader className="[&_tr]:border-border">
+          <TableRow className="hover:bg-transparent">
+            <TableHead className="h-9 px-3 text-xs text-muted-foreground">节点</TableHead>
+            <TableHead className="h-9 px-3 text-xs text-muted-foreground">出口 IP</TableHead>
+            <TableHead className="h-9 px-3 text-xs text-muted-foreground">地区</TableHead>
+            <TableHead className="h-9 px-3 text-xs text-muted-foreground">ASN / 组织</TableHead>
+            <TableHead className="h-9 px-3 text-xs text-muted-foreground">Probe</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody className="[&_tr:last-child]:border-0">
+          {rows.slice(0, 12).map((row) => (
+            <TableRow key={row.key} className="border-border hover:bg-accent/35">
+              <TableCell className="max-w-[260px] px-3 py-2.5">
+                <div className="truncate text-sm font-medium text-foreground" title={row.proxyName}>
+                  {row.proxyName}
+                </div>
+                <div className="mt-0.5 text-xs text-muted-foreground">
+                  {row.proxyType} / {row.regionLabel}
+                </div>
+              </TableCell>
+              <TableCell className="px-3 py-2.5 text-sm text-foreground">{row.probeIp || "N/A"}</TableCell>
+              <TableCell className="px-3 py-2.5 text-sm text-muted-foreground">
+                {formatProbeLocation(row)}
+              </TableCell>
+              <TableCell className="max-w-[260px] px-3 py-2.5">
+                <div className="truncate text-sm text-foreground" title={row.probeOrg || row.probeAsn || "N/A"}>
+                  {row.probeAsn || "N/A"}
+                  {row.probeOrg ? ` / ${row.probeOrg}` : ""}
+                </div>
+              </TableCell>
+              <TableCell className="px-3 py-2.5 text-xs text-muted-foreground">
+                {row.probeStatus ? `${row.probeStatus} / ${row.probeLatency || "N/A"}` : row.probeError || "N/A"}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
 function FailureTable({ rows }: { rows: ReturnType<typeof buildFailedSiteRows> }) {
   return (
     <div className="mt-3 rounded-md border border-border bg-card/45">
@@ -363,6 +419,55 @@ function FailureTable({ rows }: { rows: ReturnType<typeof buildFailedSiteRows> }
       </Table>
     </div>
   );
+}
+
+function buildProbeRows(results: AppState["results"], search: string) {
+  const normalizedSearch = search.trim().toLowerCase();
+  const rows = new Map<string, {
+    key: string;
+    proxyName: string;
+    proxyType: string;
+    regionLabel: string;
+    probeIp: string;
+    probeCountry: string;
+    probeCountryCode: string;
+    probeRegion: string;
+    probeCity: string;
+    probeAsn: string;
+    probeOrg: string;
+    probeLatency: string;
+    probeStatus: string;
+    probeError: string;
+  }>();
+
+  for (const result of results) {
+    if (normalizedSearch && !result.proxyName.toLowerCase().includes(normalizedSearch)) continue;
+    if (!result.probeIp && !result.probeStatus && !result.probeError) continue;
+    if (rows.has(result.proxyId)) continue;
+    rows.set(result.proxyId, {
+      key: result.proxyId,
+      proxyName: result.proxyName,
+      proxyType: result.proxyType,
+      regionLabel: result.regionLabel,
+      probeIp: result.probeIp ?? "",
+      probeCountry: result.probeCountry ?? "",
+      probeCountryCode: result.probeCountryCode ?? "",
+      probeRegion: result.probeRegion ?? "",
+      probeCity: result.probeCity ?? "",
+      probeAsn: result.probeAsn ?? "",
+      probeOrg: result.probeOrg ?? "",
+      probeLatency: result.probeLatency ?? "",
+      probeStatus: result.probeStatus ?? "",
+      probeError: result.probeError ?? "",
+    });
+  }
+
+  return [...rows.values()].sort((a, b) => a.proxyName.localeCompare(b.proxyName, "zh-CN"));
+}
+
+function formatProbeLocation(row: ReturnType<typeof buildProbeRows>[number]) {
+  const parts = [row.probeCountryCode, row.probeCountry, row.probeRegion, row.probeCity].filter(Boolean);
+  return parts.length ? parts.join(" / ") : "N/A";
 }
 
 function buildRunScopedChartRows(

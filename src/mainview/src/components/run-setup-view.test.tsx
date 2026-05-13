@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { RunSetupView } from "./run-setup-view";
 import type { AppState } from "../../../shared/rpc";
+import { DEFAULT_PROBE_SETTINGS } from "../../../shared/probe-settings";
 
 const state: AppState = {
   regions: [
@@ -12,6 +13,7 @@ const state: AppState = {
     { id: "youtube", name: "YouTube", url: "https://www.youtube.com/generate_204", enabled: true },
     { id: "github", name: "GitHub", url: "https://github.com", enabled: true },
   ],
+  probeSettings: DEFAULT_PROBE_SETTINGS,
   runs: [],
   results: [],
   configHistory: [],

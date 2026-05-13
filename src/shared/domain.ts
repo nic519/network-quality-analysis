@@ -22,6 +22,17 @@ export type SpeedtestRow = {
   packetLoss: string;
   downloadSpeed: string;
   uploadSpeed: string;
+  probeUrl?: string;
+  probeLatency?: string;
+  probeStatus?: string;
+  probeError?: string;
+  probeIp?: string;
+  probeCountry?: string;
+  probeCountryCode?: string;
+  probeRegion?: string;
+  probeCity?: string;
+  probeAsn?: string;
+  probeOrg?: string;
 };
 
 export type LatencyStatus = "fast" | "usable" | "slow" | "failed" | "missing";
@@ -125,25 +136,19 @@ export function enabledSiteDefinitions(sites: SiteDefinition[]): SiteDefinition[
 export function parseTSVOutput(raw: string): SpeedtestRow[] {
   const rows: SpeedtestRow[] = [];
   const lines = raw.replaceAll("\r\n", "\n").split("\n");
+  let header: Map<string, number> | null = null;
 
   for (const line of lines) {
     const trimmed = line.trim();
     if (!trimmed) continue;
 
     const fields = trimmed.split("\t").map((field) => field.trim());
-    if (isHeaderRow(fields)) continue;
+    if (isHeaderRow(fields)) {
+      header = buildHeaderIndex(fields);
+      continue;
+    }
 
-    rows.push({
-      sequence: fields[0] ?? "",
-      proxyId: extractProxyId(fields),
-      proxyName: fields[1] ?? "",
-      proxyType: fields[2] ?? "",
-      latency: fields[3] ?? "N/A",
-      jitter: fields[4] ?? "N/A",
-      packetLoss: fields[5] ?? "N/A",
-      downloadSpeed: fields[6] ?? "N/A",
-      uploadSpeed: fields[7] ?? "N/A",
-    });
+    rows.push(header ? parseHeaderRow(fields, header) : parseLegacyRow(fields));
   }
 
   return rows;
@@ -194,7 +199,86 @@ function isHeaderRow(fields: string[]): boolean {
   return joined.includes("节点名称") || joined.includes("proxy") || joined.includes("latency");
 }
 
-function extractProxyId(fields: string[]): string {
+function parseLegacyRow(fields: string[]): SpeedtestRow {
+  return withDefaultProbeFields({
+    sequence: fields[0] ?? "",
+    proxyId: extractLegacyProxyId(fields),
+    proxyName: fields[1] ?? "",
+    proxyType: fields[2] ?? "",
+    latency: fields[3] ?? "N/A",
+    jitter: fields[4] ?? "N/A",
+    packetLoss: fields[5] ?? "N/A",
+    downloadSpeed: fields[6] ?? "N/A",
+    uploadSpeed: fields[7] ?? "N/A",
+  });
+}
+
+function parseHeaderRow(fields: string[], header: Map<string, number>): SpeedtestRow {
+  const proxyName = getByHeader(fields, header, ["节点名称", "proxy name", "name"]) || "";
+  const proxyType = getByHeader(fields, header, ["类型", "proxy type", "type"]) || "";
+
+  return withDefaultProbeFields({
+    sequence: getByHeader(fields, header, ["序号", "id", "sequence"]) || "",
+    proxyId: getByHeader(fields, header, ["节点id", "proxy id"]) || legacyProxyId(proxyName, proxyType),
+    proxyName,
+    proxyType,
+    latency: getByHeader(fields, header, ["延迟", "latency"]) || "N/A",
+    jitter: getByHeader(fields, header, ["抖动", "jitter"]) || "N/A",
+    packetLoss: getByHeader(fields, header, ["丢包率", "packet loss"]) || "N/A",
+    downloadSpeed: getByHeader(fields, header, ["下载速度", "download speed"]) || "N/A",
+    uploadSpeed: getByHeader(fields, header, ["上传速度", "upload speed"]) || "N/A",
+    probeUrl: getByHeader(fields, header, ["probe url"]) || "",
+    probeLatency: getByHeader(fields, header, ["probe 延迟", "probe latency"]) || "",
+    probeStatus: getByHeader(fields, header, ["probe 状态", "probe status"]) || "",
+    probeError: getByHeader(fields, header, ["probe 错误", "probe error"]) || "",
+    probeIp: getByHeader(fields, header, ["probe.ip"]) || "",
+    probeCountry: getByHeader(fields, header, ["probe.country"]) || "",
+    probeCountryCode: getByHeader(fields, header, ["probe.country_code"]) || "",
+    probeRegion: getByHeader(fields, header, ["probe.region"]) || "",
+    probeCity: getByHeader(fields, header, ["probe.city"]) || "",
+    probeAsn: getByHeader(fields, header, ["probe.asn"]) || "",
+    probeOrg: getByHeader(fields, header, ["probe.org"]) || "",
+  });
+}
+
+function withDefaultProbeFields(row: Omit<SpeedtestRow, "probeUrl" | "probeLatency" | "probeStatus" | "probeError" | "probeIp" | "probeCountry" | "probeCountryCode" | "probeRegion" | "probeCity" | "probeAsn" | "probeOrg"> & Partial<SpeedtestRow>): SpeedtestRow {
+  return {
+    ...row,
+    probeUrl: row.probeUrl ?? "",
+    probeLatency: row.probeLatency ?? "",
+    probeStatus: row.probeStatus ?? "",
+    probeError: row.probeError ?? "",
+    probeIp: row.probeIp ?? "",
+    probeCountry: row.probeCountry ?? "",
+    probeCountryCode: row.probeCountryCode ?? "",
+    probeRegion: row.probeRegion ?? "",
+    probeCity: row.probeCity ?? "",
+    probeAsn: row.probeAsn ?? "",
+    probeOrg: row.probeOrg ?? "",
+  };
+}
+
+function buildHeaderIndex(fields: string[]) {
+  const header = new Map<string, number>();
+  fields.forEach((field, index) => {
+    header.set(normalizeHeader(field), index);
+  });
+  return header;
+}
+
+function getByHeader(fields: string[], header: Map<string, number>, names: string[]) {
+  for (const name of names) {
+    const index = header.get(normalizeHeader(name));
+    if (index !== undefined) return fields[index] ?? "";
+  }
+  return "";
+}
+
+function normalizeHeader(value: string) {
+  return value.trim().toLowerCase().replaceAll("_", " ").replace(/\s+/g, " ");
+}
+
+function extractLegacyProxyId(fields: string[]): string {
   if (fields.length === 5) return fields[4] ?? "";
   if (fields.length === 8) return fields[7] ?? "";
   if (fields.length >= 9) return fields[8] ?? "";

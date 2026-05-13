@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { DiagnosticsView } from "./diagnostics-view";
 import type { AppState } from "../../../shared/rpc";
 import type { SiteDefinition } from "../../../shared/domain";
+import { DEFAULT_PROBE_SETTINGS } from "../../../shared/probe-settings";
 
 const state: AppState["clashSpeedtest"] = {
   status: "ready",
@@ -21,10 +22,12 @@ describe("DiagnosticsView", () => {
       <DiagnosticsView
         state={state}
         sites={sites}
+        probeSettings={DEFAULT_PROBE_SETTINGS}
         onSelectBinary={() => {}}
         onSetBinaryPath={async () => {}}
         onResetBinaryPath={async () => {}}
         onSaveSites={async () => {}}
+        onSaveProbeSettings={async () => {}}
         onExportAllResults={() => {}}
         onCopyInstallCommand={async () => {}}
         canExportResults={false}

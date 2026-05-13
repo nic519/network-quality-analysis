@@ -9,6 +9,7 @@ import { api, onClashSpeedtestStatus, onProgress } from "./lib/electrobun";
 import { buildAnalysisHistoryFilters } from "./lib/history-filters";
 import { DEFAULT_SITES, REGION_PRESETS, latencyToMs } from "../../shared/domain";
 import type { RegionPreset, SiteDefinition } from "../../shared/domain";
+import { DEFAULT_PROBE_SETTINGS, type ProbeSettings } from "../../shared/probe-settings";
 import type { AppState } from "../../shared/rpc";
 
 const today = new Date().toISOString().slice(0, 10);
@@ -18,6 +19,7 @@ export default function App() {
   const [state, setState] = useState<AppState>({
     regions: REGION_PRESETS,
     sites: DEFAULT_SITES,
+    probeSettings: DEFAULT_PROBE_SETTINGS,
     configHistory: [],
     runs: [],
     results: [],
@@ -252,6 +254,17 @@ export default function App() {
     }
   }
 
+  async function saveProbeSettings(settings: ProbeSettings) {
+    setError(null);
+    try {
+      const savedSettings = await api.setProbeSettings({ settings });
+      setState((current) => ({ ...current, probeSettings: savedSettings }));
+      setProgress(`已保存 Probe API：${savedSettings.url}`);
+    } catch (caught) {
+      setError(toErrorMessage(caught));
+    }
+  }
+
   return (
     <main className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
       <header className="shrink-0 border-b border-border bg-card">
@@ -302,10 +315,12 @@ export default function App() {
           <DiagnosticsView
             state={state.clashSpeedtest}
             sites={state.sites}
+            probeSettings={state.probeSettings}
             onSelectBinary={selectClashSpeedtestBinary}
             onSetBinaryPath={setClashSpeedtestBinaryPath}
             onResetBinaryPath={resetClashSpeedtestBinaryPath}
             onSaveSites={saveTestSites}
+            onSaveProbeSettings={saveProbeSettings}
             onExportAllResults={exportAllResults}
             onCopyInstallCommand={copyInstallCommand}
             canExportResults={Boolean(state.results.length)}

@@ -27,6 +27,17 @@ type ResultDbRow = {
   packet_loss: string;
   download_speed: string;
   upload_speed: string;
+  probe_url: string;
+  probe_latency: string;
+  probe_status: string;
+  probe_error: string;
+  probe_ip: string;
+  probe_country: string;
+  probe_country_code: string;
+  probe_region: string;
+  probe_city: string;
+  probe_asn: string;
+  probe_org: string;
 };
 
 type ConfigHistoryRow = {
@@ -70,7 +81,18 @@ export class LatencyDatabase {
         jitter TEXT NOT NULL,
         packet_loss TEXT NOT NULL,
         download_speed TEXT NOT NULL,
-        upload_speed TEXT NOT NULL
+        upload_speed TEXT NOT NULL,
+        probe_url TEXT NOT NULL DEFAULT '',
+        probe_latency TEXT NOT NULL DEFAULT '',
+        probe_status TEXT NOT NULL DEFAULT '',
+        probe_error TEXT NOT NULL DEFAULT '',
+        probe_ip TEXT NOT NULL DEFAULT '',
+        probe_country TEXT NOT NULL DEFAULT '',
+        probe_country_code TEXT NOT NULL DEFAULT '',
+        probe_region TEXT NOT NULL DEFAULT '',
+        probe_city TEXT NOT NULL DEFAULT '',
+        probe_asn TEXT NOT NULL DEFAULT '',
+        probe_org TEXT NOT NULL DEFAULT ''
       );
 
       CREATE INDEX IF NOT EXISTS idx_results_run ON results(run_id);
@@ -87,6 +109,17 @@ export class LatencyDatabase {
       CREATE INDEX IF NOT EXISTS idx_config_history_last_used_at ON config_history(last_used_at);
     `);
     this.addColumnIfMissing("results", "proxy_id", "TEXT NOT NULL DEFAULT ''");
+    this.addColumnIfMissing("results", "probe_url", "TEXT NOT NULL DEFAULT ''");
+    this.addColumnIfMissing("results", "probe_latency", "TEXT NOT NULL DEFAULT ''");
+    this.addColumnIfMissing("results", "probe_status", "TEXT NOT NULL DEFAULT ''");
+    this.addColumnIfMissing("results", "probe_error", "TEXT NOT NULL DEFAULT ''");
+    this.addColumnIfMissing("results", "probe_ip", "TEXT NOT NULL DEFAULT ''");
+    this.addColumnIfMissing("results", "probe_country", "TEXT NOT NULL DEFAULT ''");
+    this.addColumnIfMissing("results", "probe_country_code", "TEXT NOT NULL DEFAULT ''");
+    this.addColumnIfMissing("results", "probe_region", "TEXT NOT NULL DEFAULT ''");
+    this.addColumnIfMissing("results", "probe_city", "TEXT NOT NULL DEFAULT ''");
+    this.addColumnIfMissing("results", "probe_asn", "TEXT NOT NULL DEFAULT ''");
+    this.addColumnIfMissing("results", "probe_org", "TEXT NOT NULL DEFAULT ''");
   }
 
   close() {
@@ -131,7 +164,18 @@ export class LatencyDatabase {
         jitter,
         packet_loss,
         download_speed,
-        upload_speed
+        upload_speed,
+        probe_url,
+        probe_latency,
+        probe_status,
+        probe_error,
+        probe_ip,
+        probe_country,
+        probe_country_code,
+        probe_region,
+        probe_city,
+        probe_asn,
+        probe_org
       )
       VALUES (
         $runId,
@@ -148,7 +192,18 @@ export class LatencyDatabase {
         $jitter,
         $packetLoss,
         $downloadSpeed,
-        $uploadSpeed
+        $uploadSpeed,
+        $probeUrl,
+        $probeLatency,
+        $probeStatus,
+        $probeError,
+        $probeIp,
+        $probeCountry,
+        $probeCountryCode,
+        $probeRegion,
+        $probeCity,
+        $probeAsn,
+        $probeOrg
       )
     `);
 
@@ -170,6 +225,17 @@ export class LatencyDatabase {
           $packetLoss: row.packetLoss,
           $downloadSpeed: row.downloadSpeed,
           $uploadSpeed: row.uploadSpeed,
+          $probeUrl: row.probeUrl ?? "",
+          $probeLatency: row.probeLatency ?? "",
+          $probeStatus: row.probeStatus ?? "",
+          $probeError: row.probeError ?? "",
+          $probeIp: row.probeIp ?? "",
+          $probeCountry: row.probeCountry ?? "",
+          $probeCountryCode: row.probeCountryCode ?? "",
+          $probeRegion: row.probeRegion ?? "",
+          $probeCity: row.probeCity ?? "",
+          $probeAsn: row.probeAsn ?? "",
+          $probeOrg: row.probeOrg ?? "",
         });
       }
     });
@@ -291,5 +357,16 @@ function fromDbRow(row: ResultDbRow): ResultRow {
     packetLoss: row.packet_loss,
     downloadSpeed: row.download_speed,
     uploadSpeed: row.upload_speed,
+    probeUrl: row.probe_url,
+    probeLatency: row.probe_latency,
+    probeStatus: row.probe_status,
+    probeError: row.probe_error,
+    probeIp: row.probe_ip,
+    probeCountry: row.probe_country,
+    probeCountryCode: row.probe_country_code,
+    probeRegion: row.probe_region,
+    probeCity: row.probe_city,
+    probeAsn: row.probe_asn,
+    probeOrg: row.probe_org,
   };
 }

@@ -9,18 +9,21 @@ import { buildApplicationMenu } from "./menu";
 import { runLatencyTest } from "./runner";
 import { getClashSpeedtestState, makeClashSpeedtestState } from "./clash-speedtest";
 import { DEFAULT_SITES, REGION_PRESETS, normalizeSiteDefinitions, type HistoryFilters, type SiteDefinition } from "../shared/domain";
+import { DEFAULT_PROBE_SETTINGS, normalizeProbeSettings, type ProbeSettings } from "../shared/probe-settings";
 import { APP_RPC_TIMEOUT_MS, type AppRPC, type ClashSpeedtestState } from "../shared/rpc";
 
 const appDir = join(homedir(), "Library/Application Support/Latency Compass");
 mkdirSync(appDir, { recursive: true });
 const manualBinaryPathFile = join(appDir, "clash-speedtest-manual-path.txt");
 const testSitesFile = join(appDir, "test-sites.json");
+const probeSettingsFile = join(appDir, "probe-settings.json");
 
 const db = new LatencyDatabase(join(appDir, "latency-compass.sqlite"));
 db.migrate();
 ApplicationMenu.setApplicationMenu(buildApplicationMenu());
 let manualClashSpeedtestPath = loadManualClashSpeedtestPath();
 let testSites = loadTestSites();
+let probeSettings = loadProbeSettings();
 let clashSpeedtestState = makeClashSpeedtestState({
   status: "missing",
   checkedAt: new Date().toISOString(),
@@ -46,7 +49,10 @@ const rpc = BrowserView.defineRPC<AppRPC>({
             ...clashSpeedtestState,
             source: "manual",
             path: manualClashSpeedtestPath,
-            message: `已指定本地 clash-speedtest：${selectedPath}`,
+            message:
+              clashSpeedtestState.status === "ready"
+                ? `已指定本地 clash-speedtest：${selectedPath}`
+                : clashSpeedtestState.message,
             checkedAt: new Date().toISOString(),
           }),
         );
@@ -63,7 +69,10 @@ const rpc = BrowserView.defineRPC<AppRPC>({
             ...clashSpeedtestState,
             source: "manual",
             path: manualClashSpeedtestPath,
-            message: `已指定 clash-speedtest 路径：${selectedPath}`,
+            message:
+              clashSpeedtestState.status === "ready"
+                ? `已指定 clash-speedtest 路径：${selectedPath}`
+                : clashSpeedtestState.message,
             checkedAt: new Date().toISOString(),
           }),
         );
@@ -87,28 +96,36 @@ const rpc = BrowserView.defineRPC<AppRPC>({
         await Bun.write(testSitesFile, JSON.stringify(testSites, null, 2));
         return testSites;
       },
+      setProbeSettings: async ({ settings }) => {
+        probeSettings = normalizeProbeSettings(settings);
+        await Bun.write(probeSettingsFile, JSON.stringify(probeSettings, null, 2));
+        return probeSettings;
+      },
       openExternalUrl: async ({ url }) => {
         await openExternalUrl(url);
         return null;
       },
       startRun: async ({ configPath, regionIds }) => {
-        publishClashSpeedtestState(
-          makeClashSpeedtestState({
-            ...clashSpeedtestState,
-            status: clashSpeedtestState.path ? "ready" : "missing",
-            message: clashSpeedtestState.path
-              ? "已检测到 clash-speedtest，开始执行测试"
-              : "未检测到 clash-speedtest，请先安装后再开始测试",
-            checkedAt: new Date().toISOString(),
-          }),
-        );
-
         try {
+          const dependencyState = await getClashSpeedtestState({ envPath: manualClashSpeedtestPath ?? undefined });
+          if (dependencyState.status !== "ready") {
+            publishClashSpeedtestState(dependencyState);
+            throw new Error(dependencyState.message);
+          }
+          publishClashSpeedtestState(
+            makeClashSpeedtestState({
+              ...dependencyState,
+              message: "已检测到匹配版本的 clash-speedtest，开始执行测试",
+              checkedAt: new Date().toISOString(),
+            }),
+          );
+
           const output = await runLatencyTest(
             { configPath, regionIds },
             {
               binaryPath: manualClashSpeedtestPath && existsSync(manualClashSpeedtestPath) ? manualClashSpeedtestPath : undefined,
               sites: testSites,
+              probeSettings,
               onProgress: (message) => {
                 window.webview.rpc?.send.progress({ message });
               },
@@ -173,6 +190,7 @@ async function getAppState(filters: HistoryFilters = {}) {
   return {
     regions: REGION_PRESETS,
     sites: testSites,
+    probeSettings,
     runs: db.listRuns(),
     results: db.queryResults(filters),
     configHistory: db.listConfigHistory(),
@@ -218,5 +236,16 @@ function loadTestSites(): SiteDefinition[] {
     return normalizeSiteDefinitions(Array.isArray(parsed) ? parsed : []);
   } catch {
     return DEFAULT_SITES;
+  }
+}
+
+function loadProbeSettings(): ProbeSettings {
+  if (!existsSync(probeSettingsFile)) return DEFAULT_PROBE_SETTINGS;
+
+  try {
+    const parsed = JSON.parse(readFileSync(probeSettingsFile, "utf8")) as Partial<ProbeSettings>;
+    return normalizeProbeSettings(parsed);
+  } catch {
+    return DEFAULT_PROBE_SETTINGS;
   }
 }

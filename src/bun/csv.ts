@@ -39,7 +39,21 @@ function buildSummaryCsv(results: ResultRow[]): string {
     rowsByProxy.set(key, [...(rowsByProxy.get(key) ?? []), row]);
   }
 
-  const headers = ["run_id", "region", "proxy_id", "proxy_name", "proxy_type", ...sites];
+  const headers = [
+    "run_id",
+    "region",
+    "proxy_id",
+    "proxy_name",
+    "proxy_type",
+    "probe_ip",
+    "probe_country",
+    "probe_country_code",
+    "probe_region",
+    "probe_city",
+    "probe_asn",
+    "probe_org",
+    ...sites,
+  ];
   const rows = Array.from(rowsByProxy.values()).map((proxyRows) => {
     const first = proxyRows[0];
     const bySite = new Map(proxyRows.map((row) => [row.siteName, row.latency]));
@@ -49,6 +63,13 @@ function buildSummaryCsv(results: ResultRow[]): string {
       first.proxyId,
       first.proxyName,
       first.proxyType,
+      first.probeIp ?? "",
+      first.probeCountry ?? "",
+      first.probeCountryCode ?? "",
+      first.probeRegion ?? "",
+      first.probeCity ?? "",
+      first.probeAsn ?? "",
+      first.probeOrg ?? "",
       ...sites.map((site) => bySite.get(site) ?? "N/A"),
     ];
   });

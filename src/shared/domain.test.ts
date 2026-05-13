@@ -75,6 +75,7 @@ describe("parseTSVOutput", () => {
         packetLoss: "N/A",
         downloadSpeed: "N/A",
         uploadSpeed: "N/A",
+        ...emptyProbeFields,
       },
       {
         sequence: "2.",
@@ -86,6 +87,7 @@ describe("parseTSVOutput", () => {
         packetLoss: "N/A",
         downloadSpeed: "N/A",
         uploadSpeed: "N/A",
+        ...emptyProbeFields,
       },
     ]);
   });
@@ -95,7 +97,54 @@ describe("parseTSVOutput", () => {
 
     expect(parseTSVOutput(raw)[0].proxyId).toBe("abc123def4567890");
   });
+
+  test("parses probe columns by header name without moving the proxy id", () => {
+    const raw = [
+      "序号\t节点名称\t类型\t延迟\tProbe URL\tProbe 延迟\tProbe 状态\tProbe 错误\tprobe.ip\tprobe.country\tprobe.country_code\tprobe.region\tprobe.city\tprobe.asn\tprobe.org\t节点ID",
+      "1.\tHK-01\tTrojan\t128ms\thttps://ipapi.co/json/\t82ms\t200\t\t203.0.113.10\tJapan\tJP\tTokyo\tTokyo\tAS64500\tExample Transit\tabc123def4567890",
+      "",
+    ].join("\n");
+
+    expect(parseTSVOutput(raw)).toEqual([
+      {
+        sequence: "1.",
+        proxyId: "abc123def4567890",
+        proxyName: "HK-01",
+        proxyType: "Trojan",
+        latency: "128ms",
+        jitter: "N/A",
+        packetLoss: "N/A",
+        downloadSpeed: "N/A",
+        uploadSpeed: "N/A",
+        probeUrl: "https://ipapi.co/json/",
+        probeLatency: "82ms",
+        probeStatus: "200",
+        probeError: "",
+        probeIp: "203.0.113.10",
+        probeCountry: "Japan",
+        probeCountryCode: "JP",
+        probeRegion: "Tokyo",
+        probeCity: "Tokyo",
+        probeAsn: "AS64500",
+        probeOrg: "Example Transit",
+      },
+    ]);
+  });
 });
+
+const emptyProbeFields = {
+  probeUrl: "",
+  probeLatency: "",
+  probeStatus: "",
+  probeError: "",
+  probeIp: "",
+  probeCountry: "",
+  probeCountryCode: "",
+  probeRegion: "",
+  probeCity: "",
+  probeAsn: "",
+  probeOrg: "",
+};
 
 describe("latency status", () => {
   test("maps latency values into visual buckets", () => {

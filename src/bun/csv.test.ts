@@ -16,8 +16,8 @@ describe("buildCsvExport", () => {
     expect(exportData).not.toHaveProperty("details");
     expect(exportData.summary).toBe(
       [
-        "run_id,region,proxy_id,proxy_name,proxy_type,YouTube,GitHub",
-        "run-1,香港,stable-proxy-id,HK-01,Trojan,128ms,188ms",
+        "run_id,region,proxy_id,proxy_name,proxy_type,probe_ip,probe_country,probe_country_code,probe_region,probe_city,probe_asn,probe_org,YouTube,GitHub",
+        "run-1,香港,stable-proxy-id,HK-01,Trojan,203.0.113.10,Japan,JP,Tokyo,Tokyo,AS64500,Example Transit,128ms,188ms",
         "",
       ].join("\n"),
     );
@@ -55,5 +55,12 @@ function makeResult(siteName: string, latency: string): ResultRow {
     packetLoss: "N/A",
     downloadSpeed: "N/A",
     uploadSpeed: "N/A",
+    probeIp: "203.0.113.10",
+    probeCountry: "Japan",
+    probeCountryCode: "JP",
+    probeRegion: "Tokyo",
+    probeCity: "Tokyo",
+    probeAsn: "AS64500",
+    probeOrg: "Example Transit",
   };
 }

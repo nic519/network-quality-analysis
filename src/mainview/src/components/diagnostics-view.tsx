@@ -6,6 +6,7 @@ import { Input } from "./ui/input";
 import { cn } from "../lib/utils";
 import { DEFAULT_SITES } from "../../../shared/domain";
 import type { SiteDefinition } from "../../../shared/domain";
+import { DEFAULT_PROBE_SETTINGS, type ProbeSettings } from "../../../shared/probe-settings";
 import type { AppState } from "../../../shared/rpc";
 import type { ThemeMode } from "../App";
 
@@ -14,10 +15,12 @@ const GO_INSTALL_COMMAND = "go install github.com/nic519/clash-speedtest@latest"
 export function DiagnosticsView({
   state,
   sites,
+  probeSettings,
   onSelectBinary,
   onSetBinaryPath,
   onResetBinaryPath,
   onSaveSites,
+  onSaveProbeSettings,
   onExportAllResults,
   onCopyInstallCommand,
   canExportResults,
@@ -26,10 +29,12 @@ export function DiagnosticsView({
 }: {
   state: AppState["clashSpeedtest"];
   sites: SiteDefinition[];
+  probeSettings: ProbeSettings;
   onSelectBinary: () => void;
   onSetBinaryPath: (path: string) => Promise<void>;
   onResetBinaryPath: () => Promise<void>;
   onSaveSites: (sites: SiteDefinition[]) => Promise<void>;
+  onSaveProbeSettings: (settings: ProbeSettings) => Promise<void>;
   onExportAllResults: () => void;
   onCopyInstallCommand: () => Promise<void>;
   canExportResults: boolean;
@@ -38,6 +43,7 @@ export function DiagnosticsView({
 }) {
   const [manualPath, setManualPath] = useState(state.source === "manual" ? state.path ?? "" : "");
   const [draftSites, setDraftSites] = useState<SiteDefinition[]>(sites);
+  const [draftProbeSettings, setDraftProbeSettings] = useState<ProbeSettings>(probeSettings);
   const [didCopyInstallCommand, setDidCopyInstallCommand] = useState(false);
 
   useEffect(() => {
@@ -47,6 +53,10 @@ export function DiagnosticsView({
   useEffect(() => {
     setDraftSites(sites);
   }, [sites]);
+
+  useEffect(() => {
+    setDraftProbeSettings(probeSettings);
+  }, [probeSettings]);
 
   useEffect(() => {
     if (!didCopyInstallCommand) return;
@@ -169,6 +179,51 @@ export function DiagnosticsView({
             </div>
           </section>
 
+          <section className="py-5">
+            <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-sm font-semibold text-foreground">出口 Probe API</h2>
+                <p className="mt-1 text-xs text-muted-foreground">用于识别每个节点的出口 IP、地区和 ASN；请求会通过节点代理发出。</p>
+              </div>
+              <Button type="button" variant="outline" size="sm" onClick={() => setDraftProbeSettings(DEFAULT_PROBE_SETTINGS)}>
+                <RotateCcw className="h-4 w-4" />
+                使用 ip.sb
+              </Button>
+            </div>
+            <div className="grid gap-3 px-3">
+              <label className="grid gap-1.5">
+                <span className="text-xs font-medium text-muted-foreground">Probe URL</span>
+                <Input
+                  value={draftProbeSettings.url}
+                  onChange={(event) => updateDraftProbeSettings({ url: event.target.value })}
+                  placeholder="https://api.ip.sb/geoip/"
+                />
+              </label>
+              <label className="grid gap-1.5">
+                <span className="text-xs font-medium text-muted-foreground">字段映射</span>
+                <Input
+                  value={draftProbeSettings.fields}
+                  onChange={(event) => updateDraftProbeSettings({ fields: event.target.value })}
+                  placeholder="ip=ip,country=country,country_code=country_code,asn=asn,org=organization"
+                />
+              </label>
+              <label className="grid gap-1.5 sm:max-w-[180px]">
+                <span className="text-xs font-medium text-muted-foreground">超时时间</span>
+                <Input
+                  value={draftProbeSettings.timeout}
+                  onChange={(event) => updateDraftProbeSettings({ timeout: event.target.value })}
+                  placeholder="8s"
+                />
+              </label>
+              <div className="flex justify-end">
+                <Button type="button" size="sm" onClick={() => onSaveProbeSettings(draftProbeSettings)}>
+                  <Save className="h-4 w-4" />
+                  保存 Probe API
+                </Button>
+              </div>
+            </div>
+          </section>
+
           <section className="grid gap-3 py-5">
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-sm font-semibold text-foreground">测速工具状态</h2>
@@ -258,6 +313,10 @@ export function DiagnosticsView({
 
   function updateDraftSite(index: number, patch: Partial<SiteDefinition>) {
     setDraftSites((current) => current.map((site, siteIndex) => (siteIndex === index ? { ...site, ...patch } : site)));
+  }
+
+  function updateDraftProbeSettings(patch: Partial<ProbeSettings>) {
+    setDraftProbeSettings((current) => ({ ...current, ...patch }));
   }
 }
 
