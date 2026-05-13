@@ -120,6 +120,10 @@ export type SetProbeSettingsParams = {
   settings: ProbeSettings;
 };
 
+export type DeleteRunParams = {
+  runId: string;
+};
+
 // 重置自定义二进制路径后的返回结果。
 export type ResetClashSpeedtestBinaryPathResponse = {
   // 是否真的清除了已有配置。
@@ -161,6 +165,8 @@ export type AppRPC = {
       openExternalUrl: { params: OpenExternalUrlParams; response: null };
       // 根据配置文件和地区列表启动一次完整测速，并返回刷新后的应用状态。
       startRun: { params: StartRunParams; response: AppState };
+      // 删除一次历史测速，并从数据库移除对应结果。
+      deleteRun: { params: DeleteRunParams; response: AppState };
       // 按当前筛选条件导出 CSV，未生成文件时返回空。
       exportCsv: { params: HistoryFilters; response: ExportCsvResponse | null };
     };

@@ -8,6 +8,7 @@ import type {
   ConfigInspectionResult,
   ExportCsvResponse,
   InspectConfigParams,
+  DeleteRunParams,
   ResetClashSpeedtestBinaryPathResponse,
   RunProgressState,
   SetProbeSettingsParams,
@@ -184,6 +185,11 @@ function createPreviewApi() {
     openExternalUrl: async ({ url }: { url: string }) => {
       window.open(url, "_blank", "noopener,noreferrer");
       return null;
+    },
+    deleteRun: async ({ runId }: DeleteRunParams) => {
+      sample.runs = sample.runs.filter((run) => run.id !== runId);
+      sample.results = sample.results.filter((row) => row.runId !== runId);
+      return getFilteredState({});
     },
     exportCsv: async (_filters: HistoryFilters): Promise<ExportCsvResponse> => ({
       summaryPath: "~/Desktop/latency-preview-summary.csv",

@@ -97,6 +97,37 @@ describe("AnalysisView", () => {
     expect(html).not.toContain("第 3 名");
   });
 
+  test("renders run region before the run id with an svg flag and no all-runs option", () => {
+    const html = renderToStaticMarkup(
+      <AnalysisView
+        state={makeState([
+          makeResult({
+            regionId: "japan",
+            regionLabel: "日本",
+            proxyName: "JP-01",
+          }),
+        ])}
+        selectedRunId="run-1"
+        onSelectedRunIdChange={() => {}}
+        fromDate="2026-05-13"
+        toDate="2026-05-13"
+        onFromDateChange={() => {}}
+        onToDateChange={() => {}}
+        search=""
+        onSearchChange={() => {}}
+        selectedSiteId="youtube"
+        onSelectedSiteIdChange={() => {}}
+        error={null}
+        onCopyResults={() => {}}
+        onDeleteRun={() => {}}
+      />,
+    );
+
+    expect(html).not.toContain("全部运行");
+    expect(html).toContain('data-region-flag="JP"');
+    expect(html).toContain('>日本</span><span class="min-w-0 truncate font-medium text-muted-foreground">run-1</span>');
+  });
+
   test("prefers a successful probe result over an earlier probe error for the same proxy", () => {
     const rows: ResultRow[] = [
       makeResult({

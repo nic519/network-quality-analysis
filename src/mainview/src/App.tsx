@@ -103,6 +103,11 @@ export default function App() {
   }, [selectedSiteId, state.results, state.sites]);
 
   useEffect(() => {
+    if (selectedRunId !== "all" || !state.runs.length) return;
+    setSelectedRunId(state.runs[0]?.id ?? "all");
+  }, [selectedRunId, state.runs]);
+
+  useEffect(() => {
     const nextSignature = state.sites.map((site) => `${site.id}:${site.enabled !== false}`).join("|");
     const shouldUseSavedSiteSelection = siteSettingsSignatureRef.current !== nextSignature;
     siteSettingsSignatureRef.current = nextSignature;
@@ -202,7 +207,7 @@ export default function App() {
         regionIds: selectedRegionIds as RegionPreset["id"][],
       });
       setState(nextState);
-      setSelectedRunId(selectedRegionIds.length > 1 ? "all" : nextState.runs[0]?.id ?? "all");
+      setSelectedRunId(nextState.runs[0]?.id ?? "all");
       setProgress("测试完成");
       setProgressLog((current) => [...current.slice(-17), "测试完成"]);
       setActiveView("analysis");
@@ -253,6 +258,28 @@ export default function App() {
       } else {
         setProgress("已取消导出");
       }
+    } catch (caught) {
+      setError(toErrorMessage(caught));
+    }
+  }
+
+  async function deleteRun(runId: string) {
+    const run = state.runs.find((item) => item.id === runId);
+    const label = run ? formatRunDeleteLabel(run) : runId;
+    if (!window.confirm(`确定删除这次历史测试？\n${label}\n\n删除后会从数据库移除对应结果。`)) return;
+
+    setError(null);
+    try {
+      const nextState = await api.deleteRun({ runId });
+      const nextSelectedRunId = selectedRunId === runId ? nextState.runs[0]?.id ?? "all" : selectedRunId;
+      const nextFilters =
+        nextSelectedRunId === "all"
+          ? buildAnalysisHistoryFilters({ selectedRunId: "all", fromDate, toDate })
+          : { runId: nextSelectedRunId };
+
+      setSelectedRunId(nextSelectedRunId);
+      setState(await api.getAppState(nextFilters));
+      setProgress("已删除历史测试");
     } catch (caught) {
       setError(toErrorMessage(caught));
     }
@@ -378,6 +405,7 @@ export default function App() {
             onSelectedSiteIdChange={setSelectedSiteId}
             error={error}
             onCopyResults={copyResults}
+            onDeleteRun={deleteRun}
           />
         ) : null}
 
@@ -467,6 +495,14 @@ function getDiagnosticsHint(state: AppState["clashSpeedtest"]) {
   if (state.status === "error") return state.message;
   if (state.status === "missing") return "未检测到本地 clash-speedtest，请先运行 go install 或在设置页指定路径。";
   return null;
+}
+
+function formatRunDeleteLabel(run: AppState["runs"][number]) {
+  return `${shortenForDialog(run.id)} · ${new Date(run.startedAt).toLocaleString("zh-CN")}`;
+}
+
+function shortenForDialog(value: string) {
+  return value.length > 24 ? value.slice(-24) : value;
 }
 
 function toErrorMessage(error: unknown) {

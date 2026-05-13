@@ -52,6 +52,35 @@ describe("LatencyDatabase", () => {
     db.close();
   });
 
+  test("deletes one run with its results and prunes orphan probe cache", () => {
+    const db = new LatencyDatabase();
+    db.migrate();
+
+    db.saveRun(makeRun("run-1", "2026-05-07T10:00:00.000Z"));
+    db.saveRun(makeRun("run-2", "2026-05-07T10:05:00.000Z"));
+    db.saveResults([
+      {
+        ...makeResult("run-1", "hong-kong", "YouTube", "128ms"),
+        probeIp: "203.0.113.10",
+        probeStatus: "200",
+      },
+      {
+        ...makeResult("run-2", "japan", "YouTube", "188ms"),
+        probeIp: "203.0.113.11",
+        probeStatus: "200",
+      },
+    ]);
+
+    expect(db.deleteRun("run-1")).toBe(true);
+
+    expect(db.listRuns().map((run) => run.id)).toEqual(["run-2"]);
+    expect(db.queryResults().map((row) => row.runId)).toEqual(["run-2"]);
+    expect(db.listCachedProbeProxyIds()).toEqual(["japan-stable-id"]);
+    expect(db.deleteRun("missing-run")).toBe(false);
+
+    db.close();
+  });
+
   test("stores probe fields in a proxy keyed table and joins them into query results", () => {
     const db = new LatencyDatabase();
     db.migrate();

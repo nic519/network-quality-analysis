@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { AlertCircle, Circle, CircleDot, Copy, Gauge, Globe2, Search, ShieldCheck, Trophy } from "lucide-react";
+import { AlertCircle, Copy, Gauge, Globe2, Search, ShieldCheck, Trash2, Trophy } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
+import { CountryFlag, getRegionFlagCode } from "./country-flag";
 import { Input } from "./ui/input";
 import { ScrollArea } from "./ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
@@ -47,6 +48,7 @@ export function AnalysisView({
   onSelectedSiteIdChange,
   error,
   onCopyResults,
+  onDeleteRun,
 }: {
   state: AppState;
   selectedRunId: string;
@@ -61,13 +63,15 @@ export function AnalysisView({
   onSelectedSiteIdChange: (value: string) => void;
   error: string | null;
   onCopyResults: () => void;
+  onDeleteRun?: (runId: string) => void;
 }) {
   const [probeSortMode, setProbeSortMode] = useState<ProbeSortMode>("proxy-name");
   const [isProbeDetailsOpen, setProbeDetailsOpen] = useState(false);
   const selectableSites = buildSelectableSites(state.sites, state.results);
   const selectedSite = selectableSites.find((site) => site.id === selectedSiteId) ?? selectableSites[0];
   const runItems = state.runs.slice(0, 12);
-  const scopedResults = filterScopedResults(state.results, selectedRunId);
+  const effectiveSelectedRunId = selectedRunId === "all" ? runItems[0]?.id ?? "all" : selectedRunId;
+  const scopedResults = filterScopedResults(state.results, effectiveSelectedRunId);
   const chartRows = buildRunScopedChartRows(scopedResults, search, selectedSite?.name);
   const availableChartRows = chartRows.filter((row) => row.isAvailable);
   const failedSiteRows = buildFailedSiteRows(scopedResults, search);
@@ -82,57 +86,56 @@ export function AnalysisView({
           <div className="flex h-14 items-center justify-between border-b border-border px-4">
             <div>
               <h1 className="text-base font-semibold text-foreground">历史测试</h1>
-              <p className="text-xs text-muted-foreground">选择一次测速，或查看所有历史。</p>
+              <p className="text-xs text-muted-foreground">选择一次测速查看明细。</p>
             </div>
             <Badge variant="outline" className="border-border bg-secondary text-muted-foreground">
               {state.runs.length} 条
             </Badge>
           </div>
 
-          <div className="border-b border-border p-2">
-            <button
-              type="button"
-              role="radio"
-              aria-checked={selectedRunId === "all"}
-              className={cn(
-                "flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm transition-colors",
-                selectedRunId === "all" ? "bg-accent text-accent-foreground" : "text-secondary-foreground hover:bg-accent/65",
-              )}
-              onClick={() => onSelectedRunIdChange("all")}
-            >
-              {selectedRunId === "all" ? <CircleDot className="h-4 w-4 text-primary" /> : <Circle className="h-4 w-4 text-muted-foreground" />}
-              <span className="min-w-0 flex-1 font-medium">全部运行</span>
-              <span className="text-xs text-muted-foreground">{state.results.length}</span>
-            </button>
-          </div>
-
           <ScrollArea className="min-h-0 flex-1 p-2" viewportClassName="h-full" contentClassName="space-y-1">
             <div role="radiogroup" aria-label="历史测试" className="space-y-1">
               {runItems.map((run) => {
-                const isActive = selectedRunId === run.id;
+                const isActive = effectiveSelectedRunId === run.id;
+                const regionLabel = formatRunRegionLabels({ run, results: state.results, regions: state.regions });
+                const primaryRegionId = getRunPrimaryRegionId(run, state.results);
                 return (
-                  <button
+                  <div
                     key={run.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={isActive}
                     className={cn(
-                      "flex w-full items-center gap-2 rounded-md px-2 py-2 text-left transition-colors",
+                      "group flex w-full items-center gap-1 rounded-md pr-1 transition-colors",
                       isActive ? "bg-accent text-accent-foreground" : "text-secondary-foreground hover:bg-accent/65",
                     )}
-                    title={run.id}
-                    onClick={() => onSelectedRunIdChange(run.id)}
                   >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 text-sm">
-                        <span className="truncate font-medium">{shortenId(run.id)}</span>
-                        <span className="truncate text-xs text-muted-foreground">
-                          {formatRunRegionLabels({ run, results: state.results, regions: state.regions })}
-                        </span>
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={isActive}
+                      className="min-w-0 flex-1 px-2 py-2 text-left"
+                      title={run.id}
+                      onClick={() => onSelectedRunIdChange(run.id)}
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 text-sm">
+                          <CountryFlag code={getRegionFlagCode(primaryRegionId)} label={regionLabel} markerName="data-region-flag" />
+                          <span className="shrink-0 font-medium text-foreground">{regionLabel}</span>
+                          <span className="min-w-0 truncate font-medium text-muted-foreground">{shortenId(run.id)}</span>
+                        </div>
+                        <div className="mt-0.5 text-xs text-muted-foreground">{formatDate(run.startedAt)}</div>
                       </div>
-                      <div className="mt-0.5 text-xs text-muted-foreground">{formatDate(run.startedAt)}</div>
-                    </div>
-                  </button>
+                    </button>
+                    {onDeleteRun ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="h-7 w-7 shrink-0 rounded-md text-muted-foreground opacity-80 hover:bg-destructive/15 hover:text-destructive"
+                        title="删除历史测试"
+                        onClick={() => onDeleteRun(run.id)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    ) : null}
+                  </div>
                 );
               })}
             </div>
@@ -678,6 +681,10 @@ export function buildRunScopedChartRows(
 
 function filterScopedResults(results: AppState["results"], selectedRunId: string) {
   return selectedRunId === "all" ? results : results.filter((result) => result.runId === selectedRunId);
+}
+
+function getRunPrimaryRegionId(run: AppState["runs"][number], results: AppState["results"]) {
+  return results.find((result) => result.runId === run.id)?.regionId ?? run.selectedRegions[0] ?? null;
 }
 
 function buildSelectableSites(sites: SiteDefinition[], results: AppState["results"]) {

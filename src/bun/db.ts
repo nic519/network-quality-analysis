@@ -323,6 +323,38 @@ export class LatencyDatabase {
     }));
   }
 
+  deleteRun(runId: string) {
+    const proxyRows = this.db
+      .query<{ proxy_id: string }, { $runId: string }>(`
+        SELECT DISTINCT proxy_id
+        FROM results
+        WHERE run_id = $runId
+          AND proxy_id <> ''
+      `)
+      .all({ $runId: runId });
+    const proxyIds = proxyRows.map((row) => row.proxy_id);
+    const deleteRun = this.db.query("DELETE FROM runs WHERE id = $runId");
+    const deleteOrphanProbe = this.db.query(`
+      DELETE FROM probe_results
+      WHERE proxy_id = $proxyId
+        AND NOT EXISTS (
+          SELECT 1
+          FROM results
+          WHERE results.proxy_id = probe_results.proxy_id
+        )
+    `);
+
+    const transaction = this.db.transaction(() => {
+      const result = deleteRun.run({ $runId: runId });
+      for (const proxyId of proxyIds) {
+        deleteOrphanProbe.run({ $proxyId: proxyId });
+      }
+      return result.changes > 0;
+    });
+
+    return transaction();
+  }
+
   listRuns(): RunRecord[] {
     const rows = this.db
       .query<RunRow, []>("SELECT * FROM runs ORDER BY started_at DESC")

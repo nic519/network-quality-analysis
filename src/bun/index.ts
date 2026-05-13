@@ -156,6 +156,10 @@ const rpc = BrowserView.defineRPC<AppRPC>({
           throw error;
         }
       },
+      deleteRun: async ({ runId }) => {
+        db.deleteRun(runId);
+        return getAppState({});
+      },
       exportCsv: async (filters) => {
         const results = db.queryResults(filters);
         const outputDir = await awaitExportDirectory();
