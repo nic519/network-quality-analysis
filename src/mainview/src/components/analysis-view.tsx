@@ -343,27 +343,30 @@ function SummaryTile({
 function ProbeSummaryPanel({ summary }: { summary: ReturnType<typeof buildProbeSummary> }) {
   return (
     <div className="mb-3 space-y-3">
-      <div className="grid gap-2 sm:grid-cols-3">
-        <SummaryTile
-          icon={ShieldCheck}
-          label="有效节点"
-          value={`${summary.effectiveNodes}/${summary.totalNodes}`}
-          detail="延迟可解析的节点数"
-        />
-        <SummaryTile
-          icon={Globe2}
-          label="独立出口 IP"
-          value={`${summary.uniqueEffectiveIps}`}
-          detail={`${summary.effectiveNodesWithIp} 个有效节点有 IP`}
-        />
-        <SummaryTile
-          icon={AlertCircle}
-          label="有效但无 IP"
-          value={`${summary.effectiveNodesMissingIp}`}
-          detail={summary.effectiveNodesMissingIp ? "Probe 未拿到出口 IP" : "有效节点均有出口 IP"}
-        />
-      </div>
-      {summary.supplierRows.length > 1 ? <SupplierSummaryTable rows={summary.supplierRows} /> : null}
+      {summary.showSupplierSummary ? (
+        <SupplierSummaryTable rows={summary.supplierRows} />
+      ) : (
+        <div className="grid gap-2 sm:grid-cols-3">
+          <SummaryTile
+            icon={ShieldCheck}
+            label="有效节点"
+            value={`${summary.effectiveNodes}/${summary.totalNodes}`}
+            detail="延迟可解析的节点数"
+          />
+          <SummaryTile
+            icon={Globe2}
+            label="独立出口 IP"
+            value={`${summary.uniqueEffectiveIps}/${summary.effectiveNodesWithIp}`}
+            detail="独立 IP / 有 IP 的有效节点"
+          />
+          <SummaryTile
+            icon={AlertCircle}
+            label="有效但无 IP"
+            value={`${summary.effectiveNodesMissingIp}`}
+            detail={summary.effectiveNodesMissingIp ? "Probe 未拿到出口 IP" : "有效节点均有出口 IP"}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -385,7 +388,7 @@ function SupplierSummaryTable({ rows }: { rows: ReturnType<typeof buildProbeSumm
             <TableRow key={row.supplier} className="border-border hover:bg-accent/35">
               <TableCell className="px-3 py-2 text-sm font-medium text-foreground">{row.supplier}</TableCell>
               <TableCell className="px-3 py-2 text-sm text-foreground">{row.effectiveNodes}/{row.totalNodes}</TableCell>
-              <TableCell className="px-3 py-2 text-sm text-foreground">{row.uniqueEffectiveIps}</TableCell>
+              <TableCell className="px-3 py-2 text-sm text-foreground">{row.uniqueEffectiveIps}/{row.effectiveNodes}</TableCell>
               <TableCell className="px-3 py-2 text-sm text-muted-foreground">{row.effectiveNodesMissingIp}</TableCell>
             </TableRow>
           ))}
@@ -507,6 +510,7 @@ type ProbeSummaryRow = {
 };
 
 type ProbeSummary = ProbeSummaryRow & {
+  showSupplierSummary: boolean;
   supplierRows: Array<ProbeSummaryRow & { supplier: string }>;
 };
 
@@ -546,20 +550,25 @@ export function buildProbeSummary(results: AppState["results"], search: string):
   const proxyRows = [...proxies.values()];
   const summary = summarizeProxyRows(proxyRows);
   const suppliers = new Map<string, ProxyProbeAccumulator[]>();
+  let prefixedProxyCount = 0;
 
   for (const proxy of proxyRows) {
     const supplier = extractSupplierPrefix(proxy.proxyName);
     if (!supplier) continue;
+    prefixedProxyCount += 1;
     const rows = suppliers.get(supplier) ?? [];
     rows.push(proxy);
     suppliers.set(supplier, rows);
   }
 
+  const supplierRows = [...suppliers.entries()]
+    .map(([supplier, rows]) => ({ supplier, ...summarizeProxyRows(rows) }))
+    .sort((left, right) => left.supplier.localeCompare(right.supplier, "zh-CN"));
+
   return {
     ...summary,
-    supplierRows: [...suppliers.entries()]
-      .map(([supplier, rows]) => ({ supplier, ...summarizeProxyRows(rows) }))
-      .sort((left, right) => left.supplier.localeCompare(right.supplier, "zh-CN")),
+    showSupplierSummary: proxyRows.length > 0 && prefixedProxyCount === proxyRows.length,
+    supplierRows,
   };
 }
 

@@ -275,6 +275,91 @@ describe("AnalysisView", () => {
     expect(summary.effectiveNodesMissingIp).toBe(1);
   });
 
+  test("renders unique probe IPs as a ratio against effective nodes with IP", () => {
+    const html = renderToStaticMarkup(
+      <AnalysisView
+        state={makeState([
+          makeResult({ proxyId: "rice-01", proxyName: "🍚-🇹🇼 [Any]TW 01", latency: "400ms", probeIp: "118.167.221.153" }),
+          makeResult({ proxyId: "plain-01", proxyName: "TW 01", latency: "665ms", probeIp: "118.167.221.153" }),
+          makeResult({ proxyId: "bird-01", proxyName: "🐦-hy2台湾01", latency: "359ms", probeIp: "36.231.118.136" }),
+        ])}
+        selectedRunId="run-1"
+        onSelectedRunIdChange={() => {}}
+        fromDate="2026-05-13"
+        toDate="2026-05-13"
+        onFromDateChange={() => {}}
+        onToDateChange={() => {}}
+        search=""
+        onSearchChange={() => {}}
+        selectedSiteId="youtube"
+        onSelectedSiteIdChange={() => {}}
+        error={null}
+        onCopyResults={() => {}}
+      />,
+    );
+
+    expect(html).toContain("独立出口 IP");
+    expect(html).toContain('title="2/3"');
+  });
+
+  test("shows only supplier comparison when every node has a supplier prefix", () => {
+    const html = renderToStaticMarkup(
+      <AnalysisView
+        state={makeState([
+          makeResult({ proxyId: "rice-01", proxyName: "🍚-🇹🇼 [Any]TW 01", latency: "400ms", probeIp: "118.167.221.153" }),
+          makeResult({ proxyId: "rice-02", proxyName: "🍚-🇹🇼 [三网]TW 02", latency: "665ms", probeIp: "118.167.221.153" }),
+          makeResult({ proxyId: "bird-01", proxyName: "🐦-hy2台湾01", latency: "359ms", probeIp: "36.231.118.136" }),
+        ])}
+        selectedRunId="run-1"
+        onSelectedRunIdChange={() => {}}
+        fromDate="2026-05-13"
+        toDate="2026-05-13"
+        onFromDateChange={() => {}}
+        onToDateChange={() => {}}
+        search=""
+        onSearchChange={() => {}}
+        selectedSiteId="youtube"
+        onSelectedSiteIdChange={() => {}}
+        error={null}
+        onCopyResults={() => {}}
+      />,
+    );
+
+    expect(html).toContain("供应商前缀");
+    expect(html).not.toContain("延迟可解析的节点数");
+    expect(html).not.toContain("独立 IP / 有 IP 的有效节点");
+    expect(html).toContain(">1/2<");
+    expect(html).toContain(">1/1<");
+  });
+
+  test("shows only node summary cards when the node list is not fully prefixed", () => {
+    const html = renderToStaticMarkup(
+      <AnalysisView
+        state={makeState([
+          makeResult({ proxyId: "rice-01", proxyName: "🍚-🇹🇼 [Any]TW 01", latency: "400ms", probeIp: "118.167.221.153" }),
+          makeResult({ proxyId: "plain-01", proxyName: "TW 01", latency: "665ms", probeIp: "118.167.221.153" }),
+          makeResult({ proxyId: "bird-01", proxyName: "🐦-hy2台湾01", latency: "359ms", probeIp: "36.231.118.136" }),
+        ])}
+        selectedRunId="run-1"
+        onSelectedRunIdChange={() => {}}
+        fromDate="2026-05-13"
+        toDate="2026-05-13"
+        onFromDateChange={() => {}}
+        onToDateChange={() => {}}
+        search=""
+        onSearchChange={() => {}}
+        selectedSiteId="youtube"
+        onSelectedSiteIdChange={() => {}}
+        error={null}
+        onCopyResults={() => {}}
+      />,
+    );
+
+    expect(html).not.toContain("供应商前缀");
+    expect(html).toContain("延迟可解析的节点数");
+    expect(html).toContain("独立 IP / 有 IP 的有效节点");
+  });
+
   test("groups probe summary by supplier prefix when proxy names use prefix separators", () => {
     const summary = buildProbeSummary(
       [
