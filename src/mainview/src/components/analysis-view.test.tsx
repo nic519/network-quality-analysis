@@ -201,6 +201,25 @@ describe("AnalysisView", () => {
     expect(html).toContain('aria-label="历史测试"');
   });
 
+  test("renders the historical run list content at full sidebar width", () => {
+    const state = makeState([]);
+
+    const html = renderToStaticMarkup(
+      <RunHistorySidebar
+        runs={state.runs}
+        results={state.results}
+        regions={state.regions}
+        selectedRunId="run-1"
+        onSelectedRunIdChange={() => {}}
+        onDeleteRun={() => {}}
+      />,
+    );
+
+    expect(html).toContain('data-slot="scroll-area-viewport" class="scrollbar-none overflow-auto h-full pr-0"');
+    expect(html).toContain('class="w-full space-y-1"');
+    expect(html).toContain('aria-label="历史测试" class="w-full space-y-1"');
+  });
+
   test("keeps run selection policy in the analysis data module", () => {
     const state = makeState([]);
 
