@@ -1,0 +1,19 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Latency Compass app icon</title>
+  <desc id="desc">A square app icon derived from the original simple black cat mark with green outline.</desc>
+  <g transform="translate(-30 2) scale(3.3)">
+    <path fill-rule="evenodd" clip-rule="evenodd" d="M154.812 109.642C167.887 106.125 180.058 96.7615 190.488 86.1713C201.069 75.4301 210.647 62.6055 218.437 50.9173C224.981 41.0961 239.38 42.2502 243.877 51.1174C251.075 65.311 259.118 81.5091 265.801 95.8277C272.61 110.414 277.652 122.306 279.244 128.268C293.709 182.465 256.927 241.435 194.722 258.168C132.518 274.901 71.2933 242.294 56.8279 188.097C55.244 182.163 53.6871 169.397 52.3159 153.423C50.97 137.743 49.8598 119.761 49.0171 103.924C48.4881 93.9947 60.3564 85.7583 70.9198 90.9527C83.4333 97.1076 98.0444 103.337 112.476 107.281C126.705 111.169 141.82 113.136 154.812 109.642Z" fill="black" stroke="#0BC847" stroke-width="24.96"/>
+    <mask id="cat-eye-mask" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="180" y="119" width="70" height="71">
+      <path fill-rule="evenodd" clip-rule="evenodd" d="M248.56 145.587C253.51 164.133 242.556 183.194 224.095 188.16C205.635 193.126 186.656 182.117 181.706 163.57C176.757 145.026 187.71 125.966 206.169 121C224.631 116.034 243.61 127.043 248.56 145.587ZM210.306 136.499C200.367 139.172 194.469 149.436 197.134 159.42C199.799 169.407 210.019 175.335 219.958 172.662C229.899 169.988 235.797 159.724 233.132 149.737C230.467 139.753 220.247 133.825 210.306 136.499Z" fill="white"/>
+    </mask>
+    <g mask="url(#cat-eye-mask)">
+      <path fill-rule="evenodd" clip-rule="evenodd" d="M156.203 120.413L249.151 95.4099L274.063 188.747L181.116 213.75L156.203 120.413Z" fill="white"/>
+    </g>
+    <mask id="cat-wink-mask" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="101" y="158" width="49" height="33">
+      <path fill-rule="evenodd" clip-rule="evenodd" d="M149.549 158.58L149.553 181.094L111.519 190.264L101.169 175.518L149.549 158.58Z" fill="white"/>
+    </mask>
+    <g mask="url(#cat-wink-mask)">
+      <path fill-rule="evenodd" clip-rule="evenodd" d="M91.9233 159.916L147.094 145.075L158.799 188.927L103.628 203.768L91.9233 159.916Z" fill="white"/>
+    </g>
+  </g>
+</svg>

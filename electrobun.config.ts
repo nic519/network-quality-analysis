@@ -35,5 +35,14 @@ export default {
       "src/mainview/electrobun.html": "views/mainview/index.html",
       "src/mainview/electrobun.css": "views/mainview/main.css",
     },
+    mac: {
+      icons: "icon.iconset",
+    },
+    win: {
+      icon: "assets/app-icon.ico",
+    },
+    linux: {
+      icon: "assets/app-icon.png",
+    },
   },
 } satisfies ElectrobunConfig;
