@@ -22,7 +22,7 @@ export function LatencyTrendsView({
   selectedSiteId: string;
   onSelectedSiteIdChange: (siteId: string) => void;
 }) {
-  const [selectedProxyIds, setSelectedProxyIds] = useState<string[]>([]);
+  const [selectedProxyIds, setSelectedProxyIds] = useState<string[] | null>(null);
   const availableSites = useMemo(() => buildTrendSites(state), [state]);
   const availableProxyIds = useMemo(
     () => getAvailableProxyIds(state.results, state.runs, selectedRegionId, selectedSiteId),
@@ -43,12 +43,14 @@ export function LatencyTrendsView({
 
   useEffect(() => {
     setSelectedProxyIds((current) => {
+      if (current === null) return null;
       const retained = current.filter((proxyId) => availableProxyIds.includes(proxyId));
       if (retained.length) return retained;
-      return availableProxyIds.slice(0, maxDefaultProxyCount);
+      return [];
     });
   }, [availableProxyIds]);
 
+  const visibleSelectedProxyIds = selectedProxyIds ?? availableProxyIds.slice(0, maxDefaultProxyCount);
   const model = useMemo(
     () =>
       buildLatencyTrendModel({
@@ -56,9 +58,9 @@ export function LatencyTrendsView({
         runs: state.runs,
         regionId: selectedRegionId,
         siteId: selectedSiteId,
-        selectedProxyIds,
+        selectedProxyIds: visibleSelectedProxyIds,
       }),
-    [selectedProxyIds, selectedRegionId, selectedSiteId, state.results, state.runs],
+    [selectedRegionId, selectedSiteId, state.results, state.runs, visibleSelectedProxyIds],
   );
 
   const activeRegion = state.regions.find((region) => region.id === selectedRegionId);
@@ -123,14 +125,22 @@ export function LatencyTrendsView({
       </div>
 
       <div className="grid min-h-[520px] gap-3 xl:grid-cols-[260px_minmax(0,1fr)]">
-        <ProxyPicker proxyRows={buildAllProxyRows(state, selectedRegionId, selectedSiteId)} selectedProxyIds={selectedProxyIds} onToggleProxyId={toggleProxyId} />
+        <ProxyPicker
+          proxyRows={buildAllProxyRows(state, selectedRegionId, selectedSiteId)}
+          selectedProxyIds={visibleSelectedProxyIds}
+          onClearSelection={() => setSelectedProxyIds([])}
+          onToggleProxyId={toggleProxyId}
+        />
         <TrendChart rows={model.chartRows} proxyRows={model.proxyRows} />
       </div>
     </section>
   );
 
   function toggleProxyId(proxyId: string) {
-    setSelectedProxyIds((current) => (current.includes(proxyId) ? current.filter((id) => id !== proxyId) : [...current, proxyId]));
+    setSelectedProxyIds((current) => {
+      const selected = current ?? visibleSelectedProxyIds;
+      return selected.includes(proxyId) ? selected.filter((id) => id !== proxyId) : [...selected, proxyId];
+    });
   }
 }
 
@@ -146,16 +156,28 @@ function FilterBand({ title, children }: { title: string; children: ReactNode })
 function ProxyPicker({
   proxyRows,
   selectedProxyIds,
+  onClearSelection,
   onToggleProxyId,
 }: {
   proxyRows: LatencyTrendProxyRow[];
   selectedProxyIds: string[];
+  onClearSelection: () => void;
   onToggleProxyId: (proxyId: string) => void;
 }) {
   return (
     <aside className="min-h-0 rounded-md border border-border bg-card/45">
-      <div className="border-b border-border px-3 py-2">
+      <div className="flex items-center gap-2 border-b border-border px-3 py-2">
         <div className="text-xs font-medium text-muted-foreground">proxyId 节点</div>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          className="ml-auto h-7 rounded-md px-2 text-xs"
+          disabled={!selectedProxyIds.length}
+          onClick={onClearSelection}
+        >
+          取消选择
+        </Button>
       </div>
       <div className="custom-scrollbar max-h-[520px] overflow-y-auto p-2">
         {proxyRows.length ? (
@@ -194,39 +216,65 @@ function TrendChart({ rows, proxyRows }: { rows: LatencyTrendChartRow[]; proxyRo
   return (
     <div className="rounded-md border border-border bg-card/45 px-3 py-3">
       {rows.length && proxyRows.length ? (
-        <div className="h-[520px]">
-          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} initialDimension={{ width: 920, height: 520 }}>
-            <LineChart accessibilityLayer data={rows} margin={{ left: 8, right: 18, top: 12, bottom: 8 }}>
-              <CartesianGrid vertical={false} stroke="rgba(120, 120, 128, 0.18)" />
-              <XAxis dataKey="runLabel" tickLine={false} axisLine={false} tickMargin={10} tick={{ fill: "rgb(142 142 147)", fontSize: 12 }} />
-              <YAxis
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={(value) => `${value}ms`}
-                tick={{ fill: "rgb(142 142 147)", fontSize: 12 }}
-                width={56}
-              />
-              <Tooltip cursor={{ stroke: "rgba(120, 120, 128, 0.35)" }} content={<TrendTooltipContent proxyRows={proxyRows} />} />
-              {proxyRows.map((proxy) => (
-                <Line
-                  key={proxy.proxyId}
-                  dataKey={proxy.dataKey}
-                  name={proxy.proxyName}
-                  type="monotone"
-                  stroke={proxy.color}
-                  strokeWidth={2}
-                  dot={false}
-                  connectNulls={false}
+        <div className="grid h-[520px] min-w-0 gap-3 lg:grid-cols-[180px_minmax(0,1fr)]">
+          <ChartNodeLabels proxyRows={proxyRows} />
+          <div className="min-w-0">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} initialDimension={{ width: 920, height: 520 }}>
+              <LineChart accessibilityLayer data={rows} margin={{ left: 8, right: 18, top: 12, bottom: 8 }}>
+                <CartesianGrid vertical={false} stroke="rgba(120, 120, 128, 0.18)" />
+                <XAxis dataKey="runLabel" tickLine={false} axisLine={false} tickMargin={10} tick={{ fill: "rgb(142 142 147)", fontSize: 12 }} />
+                <YAxis
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={(value) => `${value}ms`}
+                  tick={{ fill: "rgb(142 142 147)", fontSize: 12 }}
+                  width={56}
                 />
-              ))}
-            </LineChart>
-          </ResponsiveContainer>
+                <Tooltip cursor={{ stroke: "rgba(120, 120, 128, 0.35)" }} content={<TrendTooltipContent proxyRows={proxyRows} />} />
+                {proxyRows.map((proxy) => (
+                  <Line
+                    key={proxy.proxyId}
+                    dataKey={proxy.dataKey}
+                    name={proxy.proxyName}
+                    type="monotone"
+                    stroke={proxy.color}
+                    strokeWidth={2}
+                    dot={false}
+                    connectNulls={false}
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       ) : (
         <div className="flex h-[520px] items-center justify-center rounded-md border border-dashed border-border bg-secondary/25 text-sm text-muted-foreground">
           选择至少一个有历史延迟的 proxyId。
         </div>
       )}
+    </div>
+  );
+}
+
+function ChartNodeLabels({ proxyRows }: { proxyRows: LatencyTrendProxyRow[] }) {
+  return (
+    <div className="min-h-0 rounded-md bg-secondary/30 px-2 py-2">
+      <div className="mb-2 px-1 text-xs font-medium text-muted-foreground">图表节点</div>
+      <div className="custom-scrollbar max-h-[480px] space-y-1 overflow-y-auto pr-1">
+        {proxyRows.map((proxy) => (
+          <div key={proxy.proxyId} className="rounded-md px-1.5 py-1" data-chart-node-label={proxy.proxyId}>
+            <div className="flex items-center gap-2">
+              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: proxy.color }} />
+              <span className="min-w-0 flex-1 truncate text-xs font-medium text-foreground" title={proxy.proxyName}>
+                {proxy.proxyName}
+              </span>
+            </div>
+            <div className="mt-0.5 truncate pl-4 text-[11px] text-muted-foreground" title={proxy.proxyId}>
+              {proxy.proxyId}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

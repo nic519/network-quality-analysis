@@ -83,7 +83,7 @@ export function buildLatencyTrendModel({
     dataKey: `proxy-${index}`,
     color: trendColors[index % trendColors.length],
   }));
-  const selectedProxyIdSet = selectedProxyIds?.length ? new Set(selectedProxyIds) : null;
+  const selectedProxyIdSet = selectedProxyIds ? new Set(selectedProxyIds) : null;
   const proxyRows = indexedProxyRows.filter((row) => !selectedProxyIdSet || selectedProxyIdSet.has(row.proxyId));
 
   const chartRowsByRun = new Map<string, LatencyTrendChartRow>();
