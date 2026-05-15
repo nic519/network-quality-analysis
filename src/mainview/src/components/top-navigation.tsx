@@ -1,14 +1,15 @@
-import { BarChart3, PlayCircle, Wrench } from "lucide-react";
+import { BarChart3, LineChart, PlayCircle, Wrench } from "lucide-react";
 import { Button } from "./ui/button";
 import { ClashSpeedtestQuickStatus } from "./clash-speedtest-status";
 import { cn } from "../lib/utils";
 import type { ClashSpeedtestState } from "../../../shared/rpc";
 
-export type AppView = "run" | "analysis" | "diagnostics";
+export type AppView = "run" | "analysis" | "trends" | "diagnostics";
 
 const viewItems: Array<{ id: AppView; label: string; icon: typeof PlayCircle }> = [
   { id: "run", label: "开始测速", icon: PlayCircle },
   { id: "analysis", label: "历史结果", icon: BarChart3 },
+  { id: "trends", label: "趋势分析", icon: LineChart },
   { id: "diagnostics", label: "工具设置", icon: Wrench },
 ];
 

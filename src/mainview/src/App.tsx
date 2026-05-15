@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { TopNavigation, type AppView } from "./components/top-navigation";
 import { RunSetupView } from "./components/run-setup-view";
 import { AnalysisView } from "./components/analysis-view";
+import { LatencyTrendsView } from "./components/latency-trends-view";
 import { DiagnosticsView } from "./components/diagnostics-view";
 import type { MatrixRow } from "./lib/chart-data";
 import { buildCopyResultsText } from "./lib/copy-results-text";
@@ -42,6 +43,8 @@ export default function App() {
   const [toDate, setToDate] = useState(today);
   const [search, setSearch] = useState("");
   const [selectedSiteId, setSelectedSiteId] = useState(DEFAULT_SITES[0]?.id ?? "");
+  const [trendRegionId, setTrendRegionId] = useState<string>("hong-kong");
+  const [trendSiteId, setTrendSiteId] = useState(DEFAULT_SITES[0]?.id ?? "");
   const [pendingDeleteRunId, setPendingDeleteRunId] = useState<string | null>(null);
   const [progress, setProgress] = useState("准备就绪");
   const [progressLog, setProgressLog] = useState<string[]>(["准备就绪"]);
@@ -56,8 +59,8 @@ export default function App() {
   const [, startTransition] = useTransition();
 
   const filters = useMemo(
-    () => buildAnalysisHistoryFilters({ selectedRunId, fromDate, toDate }),
-    [fromDate, selectedRunId, toDate],
+    () => (activeView === "trends" ? {} : buildAnalysisHistoryFilters({ selectedRunId, fromDate, toDate })),
+    [activeView, fromDate, selectedRunId, toDate],
   );
 
   useEffect(
@@ -421,6 +424,16 @@ export default function App() {
             pendingDeleteRunLabel={pendingDeleteRunLabel}
             onConfirmDeleteRun={confirmDeleteRun}
             onCancelDeleteRun={cancelDeleteRun}
+          />
+        ) : null}
+
+        {activeView === "trends" ? (
+          <LatencyTrendsView
+            state={state}
+            selectedRegionId={trendRegionId}
+            onSelectedRegionIdChange={setTrendRegionId}
+            selectedSiteId={trendSiteId}
+            onSelectedSiteIdChange={setTrendSiteId}
           />
         ) : null}
 
