@@ -537,7 +537,7 @@ describe("AnalysisView", () => {
     expect(html).toContain('title="2/3"');
   });
 
-  test("shows only supplier comparison when every node has a supplier prefix", () => {
+  test("shows supplier comparison as a horizontal stacked chart when every node has a supplier prefix", () => {
     const html = renderToStaticMarkup(
       <AnalysisView
         state={makeState([
@@ -560,7 +560,14 @@ describe("AnalysisView", () => {
       />,
     );
 
-    expect(html).toContain("供应商前缀");
+    expect(html).toContain('data-supplier-chart-row-count="2"');
+    expect(html).toContain("节点有效性对比");
+    expect(html).toContain("有效且有 IP");
+    expect(html).toContain("有效但无 IP");
+    expect(html).toContain("无效节点");
+    expect(html).toContain("独立出口 IP");
+    expect(html).not.toContain("<th");
+    expect(html).not.toContain("供应商前缀");
     expect(html).not.toContain("延迟可解析的节点数");
     expect(html).not.toContain("独立 IP / 有 IP 的有效节点");
     expect(html).toContain(">1/2<");

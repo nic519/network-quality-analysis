@@ -1,9 +1,20 @@
 import { AlertCircle, Gauge, Globe2, ShieldCheck, Trophy } from "lucide-react";
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import type { LatencyChartRow } from "../lib/chart-data";
 import type { ProbeSummary } from "../lib/analysis-data";
+
+type SupplierChartRow = ProbeSummary["supplierRows"][number] & {
+  effectiveNodesWithIp: number;
+  invalidNodes: number;
+};
+
+const supplierChartSegments = [
+  { key: "effectiveNodesWithIp", label: "有效且有 IP", color: "hsl(var(--primary))" },
+  { key: "effectiveNodesMissingIp", label: "有效但无 IP", color: "rgb(217 119 6)" },
+  { key: "invalidNodes", label: "无效节点", color: "hsl(var(--muted-foreground))" },
+] as const;
 
 export function AnalysisSummary({
   fastestRow,
@@ -109,7 +120,7 @@ function ProbeSummaryPanel({ summary }: { summary: ProbeSummary }) {
   return (
     <div className="mb-3 space-y-3">
       {summary.showSupplierSummary ? (
-        <SupplierSummaryTable rows={summary.supplierRows} />
+        <SupplierSummaryChart rows={summary.supplierRows} />
       ) : (
         <div className="grid gap-2 sm:grid-cols-3">
           <SummaryTile
@@ -136,29 +147,90 @@ function ProbeSummaryPanel({ summary }: { summary: ProbeSummary }) {
   );
 }
 
-function SupplierSummaryTable({ rows }: { rows: ProbeSummary["supplierRows"] }) {
+function SupplierSummaryChart({ rows }: { rows: ProbeSummary["supplierRows"] }) {
+  const chartRows: SupplierChartRow[] = rows.map((row) => ({
+    ...row,
+    effectiveNodesWithIp: row.effectiveNodesWithIp,
+    invalidNodes: Math.max(0, row.totalNodes - row.effectiveNodes),
+  }));
+  const chartHeight = Math.max(160, chartRows.length * 44 + 36);
+
   return (
-    <div className="rounded-md border border-border bg-card/45">
-      <Table>
-        <TableHeader className="[&_tr]:border-border">
-          <TableRow className="hover:bg-transparent">
-            <TableHead className="h-8 px-3 text-xs text-muted-foreground">供应商前缀</TableHead>
-            <TableHead className="h-8 px-3 text-xs text-muted-foreground">有效 / 总节点</TableHead>
-            <TableHead className="h-8 px-3 text-xs text-muted-foreground">独立出口 IP</TableHead>
-            <TableHead className="h-8 px-3 text-xs text-muted-foreground">有效但无 IP</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody className="[&_tr:last-child]:border-0">
-          {rows.map((row) => (
-            <TableRow key={row.supplier} className="border-border hover:bg-accent/35">
-              <TableCell className="px-3 py-2 text-sm font-medium text-foreground">{row.supplier}</TableCell>
-              <TableCell className="px-3 py-2 text-sm text-foreground">{row.effectiveNodes}/{row.totalNodes}</TableCell>
-              <TableCell className="px-3 py-2 text-sm text-foreground">{row.uniqueEffectiveIps}/{row.effectiveNodes}</TableCell>
-              <TableCell className="px-3 py-2 text-sm text-muted-foreground">{row.effectiveNodesMissingIp}</TableCell>
-            </TableRow>
+    <div className="rounded-md border border-border bg-card/45 px-3 py-3" data-supplier-chart-row-count={chartRows.length}>
+      <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+        <div className="mr-auto text-xs font-medium text-muted-foreground">节点有效性对比</div>
+        {supplierChartSegments.map((segment) => (
+          <div key={segment.key} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span className="h-2.5 w-2.5 rounded-[2px]" style={{ backgroundColor: segment.color }} />
+            {segment.label}
+          </div>
+        ))}
+      </div>
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_160px]">
+        <div style={{ height: `${chartHeight}px` }}>
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} initialDimension={{ width: 780, height: chartHeight }}>
+            <BarChart accessibilityLayer data={chartRows} layout="vertical" margin={{ left: 0, right: 12, top: 8, bottom: 8 }}>
+              <CartesianGrid horizontal={false} stroke="rgba(120, 120, 128, 0.18)" />
+              <XAxis
+                type="number"
+                tickLine={false}
+                axisLine={false}
+                allowDecimals={false}
+                tick={{ fill: "rgb(142 142 147)", fontSize: 12 }}
+              />
+              <YAxis
+                type="category"
+                dataKey="supplier"
+                tickLine={false}
+                axisLine={false}
+                tickMargin={8}
+                width={48}
+                tick={{ fill: "hsl(var(--foreground))", fontSize: 18 }}
+              />
+              <Tooltip cursor={{ fill: "rgba(120, 120, 128, 0.10)" }} content={<SupplierChartTooltipContent />} />
+              <Bar dataKey="effectiveNodesWithIp" stackId="nodes" fill="hsl(var(--primary))" radius={[4, 0, 0, 4]} barSize={22} />
+              <Bar dataKey="effectiveNodesMissingIp" stackId="nodes" fill="rgb(217 119 6)" barSize={22} />
+              <Bar dataKey="invalidNodes" stackId="nodes" fill="hsl(var(--muted-foreground))" radius={[0, 4, 4, 0]} barSize={22} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="grid content-start gap-2 text-xs">
+          <div className="hidden grid-cols-[1fr_auto] px-1 font-medium text-muted-foreground lg:grid">
+            <span>独立出口 IP</span>
+            <span>有效节点</span>
+          </div>
+          {chartRows.map((row) => (
+            <div key={row.supplier} className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-md bg-secondary/45 px-2 py-1.5">
+              <span className="text-base leading-none lg:hidden">{row.supplier}</span>
+              <span className="truncate font-medium text-foreground" title={`${row.uniqueEffectiveIps}/${row.effectiveNodesWithIp}`}>
+                {row.uniqueEffectiveIps}/{row.effectiveNodesWithIp}
+              </span>
+              <span className="text-muted-foreground">{row.effectiveNodes}/{row.totalNodes}</span>
+            </div>
           ))}
-        </TableBody>
-      </Table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SupplierChartTooltipContent({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: Array<{ payload?: SupplierChartRow }>;
+}) {
+  if (!active || !payload?.length) return null;
+  const row = payload[0]?.payload;
+  if (!row) return null;
+
+  return (
+    <div className="rounded-md border border-border bg-card px-3 py-2 text-sm">
+      <div className="font-medium text-foreground">{row.supplier}</div>
+      <div className="mt-1 text-muted-foreground">有效节点：{row.effectiveNodes}/{row.totalNodes}</div>
+      <div className="text-muted-foreground">独立出口 IP：{row.uniqueEffectiveIps}/{row.effectiveNodesWithIp}</div>
+      <div className="text-muted-foreground">有效但无 IP：{row.effectiveNodesMissingIp}</div>
     </div>
   );
 }
