@@ -8,11 +8,17 @@ export function LatencyChartPanel({
   rows: LatencyChartRow[];
   selectedSiteName?: string;
 }) {
+  const chartHeight = Math.max(420, rows.length * 34 + 48);
+
   return (
-    <div className="h-[420px] rounded-md border border-border bg-card/45 px-3 py-3">
+    <div
+      className="rounded-md border border-border bg-card/45 px-3 py-3"
+      data-chart-row-count={rows.length}
+      style={{ height: `${chartHeight}px` }}
+    >
       {rows.length ? (
-        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} initialDimension={{ width: 800, height: 420 }}>
-          <BarChart accessibilityLayer data={rows.slice(0, 12)} layout="vertical" margin={{ left: 0, right: 44, top: 8, bottom: 8 }}>
+        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} initialDimension={{ width: 800, height: chartHeight }}>
+          <BarChart accessibilityLayer data={rows} layout="vertical" margin={{ left: 0, right: 44, top: 8, bottom: 8 }}>
             <CartesianGrid horizontal={false} stroke="rgba(120, 120, 128, 0.18)" />
             <XAxis
               type="number"

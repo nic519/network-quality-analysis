@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { AnalysisView, LatencyTooltipContent, buildProbeRows, buildProbeSummary, buildRunScopedChartRows } from "./analysis-view";
+import { LatencyChartPanel } from "./latency-chart-panel";
 import { RunHistorySidebar } from "./run-history-sidebar";
 import { ProbeDetailsPanel } from "./probe-details-panel";
 import { getEffectiveSelectedRunId, getVisibleRunItems } from "../lib/analysis-data";
@@ -31,6 +32,27 @@ describe("AnalysisView", () => {
     expect(html).toContain("36.231.118.136");
     expect(html).not.toContain("Vless / 台湾 / YouTube");
     expect(html).not.toContain("133ms");
+  });
+
+  test("renders every latency chart row without limiting the historical run", () => {
+    const rows = Array.from({ length: 13 }, (_, index) => {
+      const ordinal = String(index + 1).padStart(2, "0");
+      return {
+        key: `proxy-sg-${ordinal}`,
+        runId: "run-20260514T081253Z-singapore",
+        proxyName: `SG-${ordinal}`,
+        proxyType: "Trojan",
+        regionLabel: "新加坡",
+        latency: 100 + index,
+        latencyLabel: `${100 + index}ms`,
+        isAvailable: true,
+      };
+    });
+
+    const html = renderToStaticMarkup(<LatencyChartPanel rows={rows} selectedSiteName="YouTube" />);
+
+    expect(html).toContain('data-chart-row-count="13"');
+    expect(html).toContain('style="height:490px"');
   });
 
   test("renders probe IP in the failed records table", () => {
