@@ -1,4 +1,14 @@
 import { Database } from "bun:sqlite";
+import type {
+  ClashConfigSnapshot,
+  ClashConnectionSample,
+  ClashLogEvent,
+  ClashObservationBundle,
+  ClashObservationDetail,
+  ClashObservationSummary,
+  ClashProxySnapshot,
+  ClashRuleSnapshot,
+} from "../shared/clash-observation";
 import { latencyToMs, type HistoryFilters, type ResultRow, type RunRecord } from "../shared/domain";
 import type { ConfigHistoryItem, ProxyHistoryStat } from "../shared/rpc";
 
@@ -50,6 +60,74 @@ type ProxyHistoryStatRow = {
   proxy_id: string;
   site_name: string;
   latency: string;
+};
+
+type ClashObservationSummaryRow = {
+  id: string;
+  started_at: string;
+  completed_at: string | null;
+  status: "completed" | "failed";
+  controller_url: string;
+  error_message: string | null;
+  proxy_count: number;
+  connection_sample_count: number;
+  log_event_count: number;
+};
+
+type ClashLogEventRow = {
+  id: number;
+  observation_id: string;
+  event_time: string;
+  level: ClashLogEvent["level"];
+  event_type: ClashLogEvent["eventType"];
+  message: string;
+  proxy_name: string;
+  domain: string;
+  rule: string;
+};
+
+type ClashConfigSnapshotRow = {
+  observation_id: string;
+  mode: string;
+  log_level: string;
+  mixed_port: string;
+  http_port: string;
+  socks_port: string;
+  ipv6: string;
+  allow_lan: string;
+  config_hash: string;
+};
+
+type ClashProxySnapshotRow = {
+  observation_id: string;
+  proxy_name: string;
+  proxy_type: string;
+  now_proxy: string;
+  alive: string;
+  delay_ms: number | null;
+  history_json: string;
+  children_json: string;
+};
+
+type ClashRuleSnapshotRow = {
+  observation_id: string;
+  rule_index: number;
+  rule_type: string;
+  payload: string;
+  proxy: string;
+};
+
+type ClashConnectionSampleRow = {
+  observation_id: string;
+  domain: string;
+  destination_ip: string;
+  source_ip: string;
+  rule: string;
+  rule_payload: string;
+  chain: string;
+  connection_count: number;
+  upload: number;
+  download: number;
 };
 
 export class LatencyDatabase {
@@ -119,6 +197,81 @@ export class LatencyDatabase {
       );
 
       CREATE INDEX IF NOT EXISTS idx_config_history_last_used_at ON config_history(last_used_at);
+
+      CREATE TABLE IF NOT EXISTS clash_observation_runs (
+        id TEXT PRIMARY KEY,
+        started_at TEXT NOT NULL,
+        completed_at TEXT,
+        status TEXT NOT NULL,
+        controller_url TEXT NOT NULL,
+        error_message TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS clash_config_snapshots (
+        observation_id TEXT NOT NULL REFERENCES clash_observation_runs(id) ON DELETE CASCADE,
+        mode TEXT NOT NULL DEFAULT '',
+        log_level TEXT NOT NULL DEFAULT '',
+        mixed_port TEXT NOT NULL DEFAULT '',
+        http_port TEXT NOT NULL DEFAULT '',
+        socks_port TEXT NOT NULL DEFAULT '',
+        ipv6 TEXT NOT NULL DEFAULT '',
+        allow_lan TEXT NOT NULL DEFAULT '',
+        config_hash TEXT NOT NULL DEFAULT '',
+        PRIMARY KEY (observation_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS clash_proxy_snapshots (
+        observation_id TEXT NOT NULL REFERENCES clash_observation_runs(id) ON DELETE CASCADE,
+        proxy_name TEXT NOT NULL,
+        proxy_type TEXT NOT NULL,
+        now_proxy TEXT NOT NULL DEFAULT '',
+        alive TEXT NOT NULL DEFAULT '',
+        delay_ms INTEGER,
+        history_json TEXT NOT NULL DEFAULT '[]',
+        children_json TEXT NOT NULL DEFAULT '[]',
+        PRIMARY KEY (observation_id, proxy_name)
+      );
+
+      CREATE TABLE IF NOT EXISTS clash_rule_snapshots (
+        observation_id TEXT NOT NULL REFERENCES clash_observation_runs(id) ON DELETE CASCADE,
+        rule_index INTEGER NOT NULL,
+        rule_type TEXT NOT NULL,
+        payload TEXT NOT NULL DEFAULT '',
+        proxy TEXT NOT NULL DEFAULT '',
+        PRIMARY KEY (observation_id, rule_index)
+      );
+
+      CREATE TABLE IF NOT EXISTS clash_connection_samples (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        observation_id TEXT NOT NULL REFERENCES clash_observation_runs(id) ON DELETE CASCADE,
+        domain TEXT NOT NULL DEFAULT '',
+        destination_ip TEXT NOT NULL DEFAULT '',
+        source_ip TEXT NOT NULL DEFAULT '',
+        rule TEXT NOT NULL DEFAULT '',
+        rule_payload TEXT NOT NULL DEFAULT '',
+        chain TEXT NOT NULL DEFAULT '',
+        connection_count INTEGER NOT NULL DEFAULT 1,
+        upload INTEGER NOT NULL DEFAULT 0,
+        download INTEGER NOT NULL DEFAULT 0
+      );
+
+      CREATE TABLE IF NOT EXISTS clash_log_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        observation_id TEXT NOT NULL REFERENCES clash_observation_runs(id) ON DELETE CASCADE,
+        event_time TEXT NOT NULL,
+        level TEXT NOT NULL,
+        event_type TEXT NOT NULL,
+        message TEXT NOT NULL,
+        proxy_name TEXT NOT NULL DEFAULT '',
+        domain TEXT NOT NULL DEFAULT '',
+        rule TEXT NOT NULL DEFAULT ''
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_clash_observation_runs_started_at ON clash_observation_runs(started_at);
+      CREATE INDEX IF NOT EXISTS idx_clash_proxy_snapshots_proxy_name ON clash_proxy_snapshots(proxy_name, observation_id);
+      CREATE INDEX IF NOT EXISTS idx_clash_connection_samples_domain ON clash_connection_samples(domain, chain);
+      CREATE INDEX IF NOT EXISTS idx_clash_log_events_type_time ON clash_log_events(event_type, event_time);
+      CREATE INDEX IF NOT EXISTS idx_clash_log_events_observation ON clash_log_events(observation_id);
     `);
     this.addColumnIfMissing("results", "proxy_id", "TEXT NOT NULL DEFAULT ''");
     this.backfillProbeResultsFromLegacyColumns();
@@ -490,6 +643,270 @@ export class LatencyDatabase {
     return stats;
   }
 
+  saveClashObservation(bundle: ClashObservationBundle) {
+    const insertRun = this.db.query(`
+      INSERT INTO clash_observation_runs (id, started_at, completed_at, status, controller_url, error_message)
+      VALUES ($id, $startedAt, $completedAt, $status, $controllerUrl, $errorMessage)
+      ON CONFLICT(id) DO UPDATE SET
+        started_at = excluded.started_at,
+        completed_at = excluded.completed_at,
+        status = excluded.status,
+        controller_url = excluded.controller_url,
+        error_message = excluded.error_message
+    `);
+    const insertConfig = this.db.query(`
+      INSERT INTO clash_config_snapshots (
+        observation_id, mode, log_level, mixed_port, http_port, socks_port, ipv6, allow_lan, config_hash
+      )
+      VALUES (
+        $observationId, $mode, $logLevel, $mixedPort, $httpPort, $socksPort, $ipv6, $allowLan, $configHash
+      )
+      ON CONFLICT(observation_id) DO UPDATE SET
+        mode = excluded.mode,
+        log_level = excluded.log_level,
+        mixed_port = excluded.mixed_port,
+        http_port = excluded.http_port,
+        socks_port = excluded.socks_port,
+        ipv6 = excluded.ipv6,
+        allow_lan = excluded.allow_lan,
+        config_hash = excluded.config_hash
+    `);
+    const insertProxy = this.db.query(`
+      INSERT INTO clash_proxy_snapshots (
+        observation_id, proxy_name, proxy_type, now_proxy, alive, delay_ms, history_json, children_json
+      )
+      VALUES (
+        $observationId, $proxyName, $proxyType, $nowProxy, $alive, $delayMs, $historyJson, $childrenJson
+      )
+    `);
+    const insertRule = this.db.query(`
+      INSERT INTO clash_rule_snapshots (observation_id, rule_index, rule_type, payload, proxy)
+      VALUES ($observationId, $ruleIndex, $ruleType, $payload, $proxy)
+    `);
+    const insertConnection = this.db.query(`
+      INSERT INTO clash_connection_samples (
+        observation_id, domain, destination_ip, source_ip, rule, rule_payload, chain, connection_count, upload, download
+      )
+      VALUES (
+        $observationId, $domain, $destinationIp, $sourceIp, $rule, $rulePayload, $chain, $connectionCount, $upload, $download
+      )
+    `);
+    const insertLogEvent = this.db.query(`
+      INSERT INTO clash_log_events (
+        observation_id, event_time, level, event_type, message, proxy_name, domain, rule
+      )
+      VALUES (
+        $observationId, $eventTime, $level, $eventType, $message, $proxyName, $domain, $rule
+      )
+    `);
+    const clearChildRows = [
+      this.db.query("DELETE FROM clash_config_snapshots WHERE observation_id = $observationId"),
+      this.db.query("DELETE FROM clash_proxy_snapshots WHERE observation_id = $observationId"),
+      this.db.query("DELETE FROM clash_rule_snapshots WHERE observation_id = $observationId"),
+      this.db.query("DELETE FROM clash_connection_samples WHERE observation_id = $observationId"),
+      this.db.query("DELETE FROM clash_log_events WHERE observation_id = $observationId"),
+    ];
+
+    const transaction = this.db.transaction((input: ClashObservationBundle) => {
+      insertRun.run({
+        $id: input.run.id,
+        $startedAt: input.run.startedAt,
+        $completedAt: input.run.completedAt,
+        $status: input.run.status,
+        $controllerUrl: input.run.controllerUrl,
+        $errorMessage: input.run.errorMessage,
+      });
+      for (const statement of clearChildRows) {
+        statement.run({ $observationId: input.run.id });
+      }
+      if (input.config) {
+        insertConfig.run({
+          $observationId: input.config.observationId,
+          $mode: input.config.mode,
+          $logLevel: input.config.logLevel,
+          $mixedPort: input.config.mixedPort,
+          $httpPort: input.config.httpPort,
+          $socksPort: input.config.socksPort,
+          $ipv6: input.config.ipv6,
+          $allowLan: input.config.allowLan,
+          $configHash: input.config.configHash,
+        });
+      }
+      for (const row of input.proxies) {
+        insertProxy.run({
+          $observationId: row.observationId,
+          $proxyName: row.proxyName,
+          $proxyType: row.proxyType,
+          $nowProxy: row.nowProxy,
+          $alive: row.alive,
+          $delayMs: row.delayMs,
+          $historyJson: row.historyJson,
+          $childrenJson: row.childrenJson,
+        });
+      }
+      for (const row of input.rules) {
+        insertRule.run({
+          $observationId: row.observationId,
+          $ruleIndex: row.ruleIndex,
+          $ruleType: row.ruleType,
+          $payload: row.payload,
+          $proxy: row.proxy,
+        });
+      }
+      for (const row of input.connections) {
+        insertConnection.run({
+          $observationId: row.observationId,
+          $domain: row.domain,
+          $destinationIp: row.destinationIp,
+          $sourceIp: row.sourceIp,
+          $rule: row.rule,
+          $rulePayload: row.rulePayload,
+          $chain: row.chain,
+          $connectionCount: row.connectionCount,
+          $upload: row.upload,
+          $download: row.download,
+        });
+      }
+      for (const event of input.logEvents) {
+        insertLogEvent.run({
+          $observationId: event.observationId,
+          $eventTime: event.eventTime,
+          $level: event.level,
+          $eventType: event.eventType,
+          $message: event.message,
+          $proxyName: event.proxyName,
+          $domain: event.domain,
+          $rule: event.rule,
+        });
+      }
+    });
+
+    transaction(bundle);
+  }
+
+  listClashObservationSummaries(limit = 20): ClashObservationSummary[] {
+    const rows = this.db
+      .query<ClashObservationSummaryRow, { $limit: number }>(`
+        SELECT
+          runs.id,
+          runs.started_at,
+          runs.completed_at,
+          runs.status,
+          runs.controller_url,
+          runs.error_message,
+          COUNT(DISTINCT proxies.proxy_name) AS proxy_count,
+          COUNT(DISTINCT connections.id) AS connection_sample_count,
+          COUNT(DISTINCT events.id) AS log_event_count
+        FROM clash_observation_runs runs
+        LEFT JOIN clash_proxy_snapshots proxies ON proxies.observation_id = runs.id
+        LEFT JOIN clash_connection_samples connections ON connections.observation_id = runs.id
+        LEFT JOIN clash_log_events events ON events.observation_id = runs.id
+        GROUP BY runs.id
+        ORDER BY runs.started_at DESC
+        LIMIT $limit
+      `)
+      .all({ $limit: limit });
+
+    return rows.map((row) => ({
+      id: row.id,
+      startedAt: row.started_at,
+      completedAt: row.completed_at,
+      status: row.status,
+      controllerUrl: row.controller_url,
+      errorMessage: row.error_message,
+      proxyCount: row.proxy_count,
+      connectionSampleCount: row.connection_sample_count,
+      logEventCount: row.log_event_count,
+    }));
+  }
+
+  listClashLogEvents(limit = 50): ClashLogEvent[] {
+    const rows = this.db
+      .query<ClashLogEventRow, { $limit: number }>(`
+        SELECT id, observation_id, event_time, level, event_type, message, proxy_name, domain, rule
+        FROM clash_log_events
+        ORDER BY event_time DESC, id DESC
+        LIMIT $limit
+      `)
+      .all({ $limit: limit });
+
+    return rows.map((row) => ({
+      id: row.id,
+      observationId: row.observation_id,
+      eventTime: row.event_time,
+      level: row.level,
+      eventType: row.event_type,
+      message: row.message,
+      proxyName: row.proxy_name,
+      domain: row.domain,
+      rule: row.rule,
+    }));
+  }
+
+  getClashObservationDetail(observationId: string): ClashObservationDetail | null {
+    const summary = this.listClashObservationSummaries(200).find((item) => item.id === observationId);
+    if (!summary) return null;
+
+    const configRow = this.db
+      .query<ClashConfigSnapshotRow, { $observationId: string }>(`
+        SELECT observation_id, mode, log_level, mixed_port, http_port, socks_port, ipv6, allow_lan, config_hash
+        FROM clash_config_snapshots
+        WHERE observation_id = $observationId
+      `)
+      .get({ $observationId: observationId });
+    const proxyRows = this.db
+      .query<ClashProxySnapshotRow, { $observationId: string }>(`
+        SELECT observation_id, proxy_name, proxy_type, now_proxy, alive, delay_ms, history_json, children_json
+        FROM clash_proxy_snapshots
+        WHERE observation_id = $observationId
+        ORDER BY proxy_name
+      `)
+      .all({ $observationId: observationId });
+    const ruleRows = this.db
+      .query<ClashRuleSnapshotRow, { $observationId: string }>(`
+        SELECT observation_id, rule_index, rule_type, payload, proxy
+        FROM clash_rule_snapshots
+        WHERE observation_id = $observationId
+        ORDER BY rule_index
+      `)
+      .all({ $observationId: observationId });
+    const connectionRows = this.db
+      .query<ClashConnectionSampleRow, { $observationId: string }>(`
+        SELECT observation_id, domain, destination_ip, source_ip, rule, rule_payload, chain, connection_count, upload, download
+        FROM clash_connection_samples
+        WHERE observation_id = $observationId
+        ORDER BY connection_count DESC, download DESC, upload DESC, domain
+      `)
+      .all({ $observationId: observationId });
+    const logRows = this.db
+      .query<ClashLogEventRow, { $observationId: string }>(`
+        SELECT id, observation_id, event_time, level, event_type, message, proxy_name, domain, rule
+        FROM clash_log_events
+        WHERE observation_id = $observationId
+        ORDER BY event_time DESC, id DESC
+      `)
+      .all({ $observationId: observationId });
+
+    return {
+      summary,
+      config: configRow ? fromClashConfigSnapshotRow(configRow) : null,
+      proxies: proxyRows.map(fromClashProxySnapshotRow),
+      rules: ruleRows.map(fromClashRuleSnapshotRow),
+      connections: connectionRows.map(fromClashConnectionSampleRow),
+      logEvents: logRows.map(fromClashLogEventRow),
+    };
+  }
+
+  pruneClashObservations(cutoffStartedAt: string) {
+    const count = this.db
+      .query<{ count: number }, { $cutoffStartedAt: string }>("SELECT COUNT(*) AS count FROM clash_observation_runs WHERE started_at < $cutoffStartedAt")
+      .get({ $cutoffStartedAt: cutoffStartedAt })?.count ?? 0;
+    this.db.query("DELETE FROM clash_observation_runs WHERE started_at < $cutoffStartedAt").run({
+      $cutoffStartedAt: cutoffStartedAt,
+    });
+    return count;
+  }
+
   private addColumnIfMissing(tableName: string, columnName: string, definition: string) {
     const columns = this.db.query<{ name: string }, []>(`PRAGMA table_info(${tableName})`).all();
     if (columns.some((column) => column.name === columnName)) return;
@@ -610,6 +1027,72 @@ export class LatencyDatabase {
       CREATE INDEX IF NOT EXISTS idx_results_proxy_id ON results(proxy_id);
     `);
   }
+}
+
+function fromClashConfigSnapshotRow(row: ClashConfigSnapshotRow): ClashConfigSnapshot {
+  return {
+    observationId: row.observation_id,
+    mode: row.mode,
+    logLevel: row.log_level,
+    mixedPort: row.mixed_port,
+    httpPort: row.http_port,
+    socksPort: row.socks_port,
+    ipv6: row.ipv6,
+    allowLan: row.allow_lan,
+    configHash: row.config_hash,
+  };
+}
+
+function fromClashProxySnapshotRow(row: ClashProxySnapshotRow): ClashProxySnapshot {
+  return {
+    observationId: row.observation_id,
+    proxyName: row.proxy_name,
+    proxyType: row.proxy_type,
+    nowProxy: row.now_proxy,
+    alive: row.alive,
+    delayMs: row.delay_ms,
+    historyJson: row.history_json,
+    childrenJson: row.children_json,
+  };
+}
+
+function fromClashRuleSnapshotRow(row: ClashRuleSnapshotRow): ClashRuleSnapshot {
+  return {
+    observationId: row.observation_id,
+    ruleIndex: row.rule_index,
+    ruleType: row.rule_type,
+    payload: row.payload,
+    proxy: row.proxy,
+  };
+}
+
+function fromClashConnectionSampleRow(row: ClashConnectionSampleRow): ClashConnectionSample {
+  return {
+    observationId: row.observation_id,
+    domain: row.domain,
+    destinationIp: row.destination_ip,
+    sourceIp: row.source_ip,
+    rule: row.rule,
+    rulePayload: row.rule_payload,
+    chain: row.chain,
+    connectionCount: row.connection_count,
+    upload: row.upload,
+    download: row.download,
+  };
+}
+
+function fromClashLogEventRow(row: ClashLogEventRow): ClashLogEvent {
+  return {
+    id: row.id,
+    observationId: row.observation_id,
+    eventTime: row.event_time,
+    level: row.level,
+    eventType: row.event_type,
+    message: row.message,
+    proxyName: row.proxy_name,
+    domain: row.domain,
+    rule: row.rule,
+  };
 }
 
 function hasProbeEvidence(row: ResultRow) {

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { LatencyTrendsView } from "./latency-trends-view";
+import { DEFAULT_CLASH_OBSERVATION_SETTINGS } from "../../../shared/clash-observation";
 import { DEFAULT_PROBE_SETTINGS } from "../../../shared/probe-settings";
 import { DEFAULT_SITES, REGION_PRESETS, type ResultRow } from "../../../shared/domain";
 import type { AppState } from "../../../shared/rpc";
@@ -32,6 +33,11 @@ function makeState(results: ResultRow[]): AppState {
     regions: REGION_PRESETS,
     sites: DEFAULT_SITES,
     probeSettings: DEFAULT_PROBE_SETTINGS,
+    clashObservation: {
+      settings: DEFAULT_CLASH_OBSERVATION_SETTINGS,
+      summaries: [],
+      logEvents: [],
+    },
     runs: [
       {
         id: "run-1",

@@ -2,12 +2,15 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { TopNavigation, type AppView } from "./components/top-navigation";
 import { RunSetupView } from "./components/run-setup-view";
 import { AnalysisView } from "./components/analysis-view";
+import { ClashObservationView } from "./components/clash-observation-view";
 import { LatencyTrendsView } from "./components/latency-trends-view";
 import { DiagnosticsView } from "./components/diagnostics-view";
 import type { MatrixRow } from "./lib/chart-data";
 import { buildCopyResultsText } from "./lib/copy-results-text";
 import { api, onClashSpeedtestStatus, onProgress, onRunProgress } from "./lib/electrobun";
 import { buildAnalysisHistoryFilters } from "./lib/history-filters";
+import { DEFAULT_CLASH_OBSERVATION_SETTINGS } from "../../shared/clash-observation";
+import type { ClashObservationDetail } from "../../shared/clash-observation";
 import { DEFAULT_SITES, REGION_PRESETS, latencyToMs } from "../../shared/domain";
 import type { RegionPreset, SiteDefinition } from "../../shared/domain";
 import { DEFAULT_PROBE_SETTINGS, type ProbeSettings } from "../../shared/probe-settings";
@@ -21,6 +24,11 @@ export default function App() {
     regions: REGION_PRESETS,
     sites: DEFAULT_SITES,
     probeSettings: DEFAULT_PROBE_SETTINGS,
+    clashObservation: {
+      settings: DEFAULT_CLASH_OBSERVATION_SETTINGS,
+      summaries: [],
+      logEvents: [],
+    },
     configHistory: [],
     runs: [],
     results: [],
@@ -45,6 +53,8 @@ export default function App() {
   const [selectedSiteId, setSelectedSiteId] = useState(DEFAULT_SITES[0]?.id ?? "");
   const [trendRegionId, setTrendRegionId] = useState<string>("hong-kong");
   const [trendSiteId, setTrendSiteId] = useState(DEFAULT_SITES[0]?.id ?? "");
+  const [selectedObservationId, setSelectedObservationId] = useState<string | null>(null);
+  const [selectedObservationDetail, setSelectedObservationDetail] = useState<ClashObservationDetail | null>(null);
   const [pendingDeleteRunId, setPendingDeleteRunId] = useState<string | null>(null);
   const [progress, setProgress] = useState("准备就绪");
   const [progressLog, setProgressLog] = useState<string[]>(["准备就绪"]);
@@ -111,6 +121,32 @@ export default function App() {
     if (selectedRunId !== "all" || !state.runs.length) return;
     setSelectedRunId(state.runs[0]?.id ?? "all");
   }, [selectedRunId, state.runs]);
+
+  useEffect(() => {
+    if (selectedObservationId || !state.clashObservation.summaries.length) return;
+    setSelectedObservationId(state.clashObservation.summaries[0]?.id ?? null);
+  }, [selectedObservationId, state.clashObservation.summaries]);
+
+  useEffect(() => {
+    if (activeView !== "observation" || !selectedObservationId) return;
+
+    let isCancelled = false;
+    startTransition(async () => {
+      try {
+        const detail = await api.getClashObservationDetail({ observationId: selectedObservationId });
+        if (!isCancelled) setSelectedObservationDetail(detail);
+      } catch (caught) {
+        if (!isCancelled) {
+          setSelectedObservationDetail(null);
+          setError(toErrorMessage(caught));
+        }
+      }
+    });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [activeView, selectedObservationId]);
 
   useEffect(() => {
     const nextSignature = state.sites.map((site) => `${site.id}:${site.enabled !== false}`).join("|");
@@ -371,6 +407,34 @@ export default function App() {
     }
   }
 
+  async function saveClashObservationSettings(settings: AppState["clashObservation"]["settings"]) {
+    setError(null);
+    try {
+      const nextState = await api.setClashObservationSettings({ settings });
+      setState(nextState);
+      if (nextState.clashObservation.summaries[0]) setSelectedObservationId(nextState.clashObservation.summaries[0].id);
+      setProgress(settings.enabled ? "已启用 Clash 定时观测" : "已保存 Clash 观测设置");
+    } catch (caught) {
+      setError(toErrorMessage(caught));
+    }
+  }
+
+  async function runClashObservation() {
+    setError(null);
+    try {
+      setProgress("正在执行 Clash 观测");
+      const nextState = await api.runClashObservation();
+      setState(nextState);
+      const nextObservationId = nextState.clashObservation.summaries[0]?.id ?? null;
+      setSelectedObservationId(nextObservationId);
+      if (nextObservationId) {
+        setSelectedObservationDetail(await api.getClashObservationDetail({ observationId: nextObservationId }));
+      }
+    } catch (caught) {
+      setError(toErrorMessage(caught));
+    }
+  }
+
   const pendingDeleteRun = pendingDeleteRunId ? state.runs.find((run) => run.id === pendingDeleteRunId) ?? null : null;
   const pendingDeleteRunLabel = pendingDeleteRun ? formatRunDeleteLabel(pendingDeleteRun) : null;
 
@@ -437,16 +501,31 @@ export default function App() {
           />
         ) : null}
 
+        {activeView === "observation" ? (
+          <ClashObservationView
+            state={state}
+            selectedObservationId={selectedObservationId}
+            detail={selectedObservationDetail}
+            onSelectedObservationIdChange={(observationId) => {
+              setSelectedObservationId(observationId);
+              setSelectedObservationDetail(null);
+            }}
+          />
+        ) : null}
+
         {activeView === "diagnostics" ? (
           <DiagnosticsView
             state={state.clashSpeedtest}
             sites={state.sites}
             probeSettings={state.probeSettings}
+            clashObservation={state.clashObservation}
             onSelectBinary={selectClashSpeedtestBinary}
             onSetBinaryPath={setClashSpeedtestBinaryPath}
             onResetBinaryPath={resetClashSpeedtestBinaryPath}
             onSaveSites={saveTestSites}
             onSaveProbeSettings={saveProbeSettings}
+            onSaveClashObservationSettings={saveClashObservationSettings}
+            onRunClashObservation={runClashObservation}
             onExportAllResults={exportAllResults}
             onCopyInstallCommand={copyInstallCommand}
             canExportResults={Boolean(state.results.length)}

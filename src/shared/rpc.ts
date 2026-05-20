@@ -1,4 +1,5 @@
 import type { RPCSchema } from "electrobun/bun";
+import type { ClashObservationDetail, ClashObservationSettings, ClashObservationState } from "./clash-observation";
 import type { HistoryFilters, RegionPreset, ResultRow, RunRecord, SiteDefinition } from "./domain";
 import type { ProbeSettings } from "./probe-settings";
 
@@ -23,6 +24,8 @@ export type AppState = {
   configHistory: ConfigHistoryItem[];
   // clash-speedtest 可执行文件的检测状态。
   clashSpeedtest: ClashSpeedtestState;
+  // Clash/Mihomo controller 定时观测状态和最近历史。
+  clashObservation: ClashObservationState;
 };
 
 // clash-speedtest 二进制工具的可用性状态。
@@ -122,6 +125,14 @@ export type SetProbeSettingsParams = {
   settings: ProbeSettings;
 };
 
+export type SetClashObservationSettingsParams = {
+  settings: ClashObservationSettings;
+};
+
+export type GetClashObservationDetailParams = {
+  observationId: string;
+};
+
 export type DeleteRunParams = {
   runId: string;
 };
@@ -181,6 +192,12 @@ export type AppRPC = {
       setTestSites: { params: SetTestSitesParams; response: SiteDefinition[] };
       // 保存节点出口 probe API 配置，并返回规范化后的配置。
       setProbeSettings: { params: SetProbeSettingsParams; response: ProbeSettings };
+      // 保存 Clash/Mihomo controller 观测配置，并返回刷新后的应用状态。
+      setClashObservationSettings: { params: SetClashObservationSettingsParams; response: AppState };
+      // 手动触发一次 Clash/Mihomo controller 观测，并返回刷新后的应用状态。
+      runClashObservation: { params: undefined; response: AppState };
+      // 查询一次 Clash/Mihomo controller 观测的完整复盘详情。
+      getClashObservationDetail: { params: GetClashObservationDetailParams; response: ClashObservationDetail | null };
       // 让宿主环境在外部浏览器中打开指定链接。
       openExternalUrl: { params: OpenExternalUrlParams; response: null };
       // 根据配置文件和地区列表启动一次完整测速，并返回刷新后的应用状态。

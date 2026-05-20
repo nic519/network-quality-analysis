@@ -3,6 +3,7 @@ import { Database } from "bun:sqlite";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { LatencyDatabase } from "./db";
+import type { ClashObservationBundle } from "../shared/clash-observation";
 import type { ResultRow, RunRecord } from "../shared/domain";
 
 describe("LatencyDatabase", () => {
@@ -258,6 +259,139 @@ describe("LatencyDatabase", () => {
 
     db.close();
   });
+
+  test("stores clash observation snapshots and queries summaries with recent log events", () => {
+    const db = new LatencyDatabase();
+    db.migrate();
+
+    db.saveClashObservation(makeObservationBundle("obs-1", "2026-05-20T10:00:00.000Z"));
+
+    expect(db.listClashObservationSummaries()).toEqual([
+      {
+        id: "obs-1",
+        startedAt: "2026-05-20T10:00:00.000Z",
+        completedAt: "2026-05-20T10:00:03.000Z",
+        status: "completed",
+        controllerUrl: "http://127.0.0.1:9090",
+        errorMessage: null,
+        proxyCount: 1,
+        connectionSampleCount: 1,
+        logEventCount: 1,
+      },
+    ]);
+    expect(db.listClashLogEvents(5)).toEqual([
+      {
+        id: 1,
+        observationId: "obs-1",
+        eventTime: "2026-05-20T10:00:02.000Z",
+        level: "warning",
+        eventType: "dns",
+        message: "[DNS] github.com lookup failed",
+        proxyName: "",
+        domain: "github.com",
+        rule: "",
+      },
+    ]);
+
+    db.close();
+  });
+
+  test("queries full clash observation details for review", () => {
+    const db = new LatencyDatabase();
+    db.migrate();
+
+    db.saveClashObservation(makeObservationBundle("obs-1", "2026-05-20T10:00:00.000Z"));
+
+    expect(db.getClashObservationDetail("obs-1")).toEqual({
+      summary: {
+        id: "obs-1",
+        startedAt: "2026-05-20T10:00:00.000Z",
+        completedAt: "2026-05-20T10:00:03.000Z",
+        status: "completed",
+        controllerUrl: "http://127.0.0.1:9090",
+        errorMessage: null,
+        proxyCount: 1,
+        connectionSampleCount: 1,
+        logEventCount: 1,
+      },
+      config: {
+        observationId: "obs-1",
+        mode: "rule",
+        logLevel: "warning",
+        mixedPort: "7890",
+        httpPort: "",
+        socksPort: "",
+        ipv6: "true",
+        allowLan: "false",
+        configHash: "hash-1",
+      },
+      proxies: [
+        {
+          observationId: "obs-1",
+          proxyName: "HK-01",
+          proxyType: "Trojan",
+          nowProxy: "",
+          alive: "true",
+          delayMs: 128,
+          historyJson: "[]",
+          childrenJson: "[]",
+        },
+      ],
+      rules: [
+        {
+          observationId: "obs-1",
+          ruleIndex: 0,
+          ruleType: "RuleSet",
+          payload: "github",
+          proxy: "Proxy",
+        },
+      ],
+      connections: [
+        {
+          observationId: "obs-1",
+          domain: "github.com",
+          destinationIp: "140.82.112.4",
+          sourceIp: "192.168.1.2",
+          rule: "RuleSet",
+          rulePayload: "github",
+          chain: "Proxy > HK-01",
+          connectionCount: 2,
+          upload: 150,
+          download: 370,
+        },
+      ],
+      logEvents: [
+        {
+          id: 1,
+          observationId: "obs-1",
+          eventTime: "2026-05-20T10:00:02.000Z",
+          level: "warning",
+          eventType: "dns",
+          message: "[DNS] github.com lookup failed",
+          proxyName: "",
+          domain: "github.com",
+          rule: "",
+        },
+      ],
+    });
+    expect(db.getClashObservationDetail("missing")).toBeNull();
+
+    db.close();
+  });
+
+  test("prunes clash observations older than retention cutoff", () => {
+    const db = new LatencyDatabase();
+    db.migrate();
+
+    db.saveClashObservation(makeObservationBundle("old-obs", "2026-05-01T10:00:00.000Z"));
+    db.saveClashObservation(makeObservationBundle("new-obs", "2026-05-20T10:00:00.000Z"));
+
+    expect(db.pruneClashObservations("2026-05-10T00:00:00.000Z")).toBe(1);
+    expect(db.listClashObservationSummaries().map((summary) => summary.id)).toEqual(["new-obs"]);
+    expect(db.listClashLogEvents().map((event) => event.observationId)).toEqual(["new-obs"]);
+
+    db.close();
+  });
 });
 
 function makeRun(id: string, startedAt: string): RunRecord {
@@ -304,5 +438,79 @@ function makeResult(
     probeCity: "",
     probeAsn: "",
     probeOrg: "",
+  };
+}
+
+function makeObservationBundle(id: string, startedAt: string): ClashObservationBundle {
+  const startedAtDate = new Date(startedAt);
+  const completedAt = new Date(startedAtDate.getTime() + 3000).toISOString();
+  const eventTime = new Date(startedAtDate.getTime() + 2000).toISOString();
+  return {
+    run: {
+      id,
+      startedAt,
+      completedAt,
+      status: "completed",
+      controllerUrl: "http://127.0.0.1:9090",
+      errorMessage: null,
+    },
+    config: {
+      observationId: id,
+      mode: "rule",
+      logLevel: "warning",
+      mixedPort: "7890",
+      httpPort: "",
+      socksPort: "",
+      ipv6: "true",
+      allowLan: "false",
+      configHash: "hash-1",
+    },
+    proxies: [
+      {
+        observationId: id,
+        proxyName: "HK-01",
+        proxyType: "Trojan",
+        nowProxy: "",
+        alive: "true",
+        delayMs: 128,
+        historyJson: "[]",
+        childrenJson: "[]",
+      },
+    ],
+    rules: [
+      {
+        observationId: id,
+        ruleIndex: 0,
+        ruleType: "RuleSet",
+        payload: "github",
+        proxy: "Proxy",
+      },
+    ],
+    connections: [
+      {
+        observationId: id,
+        domain: "github.com",
+        destinationIp: "140.82.112.4",
+        sourceIp: "192.168.1.2",
+        rule: "RuleSet",
+        rulePayload: "github",
+        chain: "Proxy > HK-01",
+        connectionCount: 2,
+        upload: 150,
+        download: 370,
+      },
+    ],
+    logEvents: [
+      {
+        observationId: id,
+        eventTime,
+        level: "warning",
+        eventType: "dns",
+        message: "[DNS] github.com lookup failed",
+        proxyName: "",
+        domain: "github.com",
+        rule: "",
+      },
+    ],
   };
 }

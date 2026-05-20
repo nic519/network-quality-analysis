@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { ApplicationMenu, BrowserView, BrowserWindow, Utils } from "electrobun/bun";
+import { collectClashObservation } from "./clash-observation";
 import { writeCsvExport } from "./csv";
 import { inspectConfigRegions } from "./config-inspection";
 import { LatencyDatabase } from "./db";
@@ -10,6 +11,7 @@ import { buildApplicationMenu } from "./menu";
 import { runLatencyTest } from "./runner";
 import { getClashSpeedtestState, makeClashSpeedtestState } from "./clash-speedtest";
 import { DEFAULT_SITES, REGION_PRESETS, normalizeSiteDefinitions, type HistoryFilters, type SiteDefinition } from "../shared/domain";
+import { DEFAULT_CLASH_OBSERVATION_SETTINGS, normalizeClashObservationSettings, type ClashObservationSettings } from "../shared/clash-observation";
 import { DEFAULT_PROBE_SETTINGS, normalizeProbeSettings, type ProbeSettings } from "../shared/probe-settings";
 import { APP_RPC_TIMEOUT_MS, type AppRPC, type ClashSpeedtestState } from "../shared/rpc";
 
@@ -18,6 +20,7 @@ mkdirSync(appDir, { recursive: true });
 const manualBinaryPathFile = join(appDir, "clash-speedtest-manual-path.txt");
 const testSitesFile = join(appDir, "test-sites.json");
 const probeSettingsFile = join(appDir, "probe-settings.json");
+const clashObservationSettingsFile = join(appDir, "clash-observation-settings.json");
 
 const db = new LatencyDatabase(join(appDir, "latency-compass.sqlite"));
 db.migrate();
@@ -25,10 +28,12 @@ ApplicationMenu.setApplicationMenu(buildApplicationMenu());
 let manualClashSpeedtestPath = loadManualClashSpeedtestPath();
 let testSites = loadTestSites();
 let probeSettings = loadProbeSettings();
+let clashObservationSettings = loadClashObservationSettings();
 let clashSpeedtestState = makeClashSpeedtestState({
   status: "missing",
   checkedAt: new Date().toISOString(),
 });
+let clashObservationTimer: ReturnType<typeof setInterval> | null = null;
 
 const rpc = BrowserView.defineRPC<AppRPC>({
   maxRequestTime: APP_RPC_TIMEOUT_MS,
@@ -103,6 +108,17 @@ const rpc = BrowserView.defineRPC<AppRPC>({
         await Bun.write(probeSettingsFile, JSON.stringify(probeSettings, null, 2));
         return probeSettings;
       },
+      setClashObservationSettings: async ({ settings }) => {
+        clashObservationSettings = normalizeClashObservationSettings(settings);
+        await Bun.write(clashObservationSettingsFile, JSON.stringify(clashObservationSettings, null, 2));
+        scheduleClashObservation();
+        return getAppState({});
+      },
+      runClashObservation: async () => {
+        await runAndSaveClashObservation("manual");
+        return getAppState({});
+      },
+      getClashObservationDetail: async ({ observationId }) => db.getClashObservationDetail(observationId),
       openExternalUrl: async ({ url }) => {
         await openExternalUrl(url);
         return null;
@@ -187,6 +203,7 @@ window = new BrowserWindow<typeof rpc>({
   },
   rpc,
 });
+scheduleClashObservation();
 
 async function getAppState(filters: HistoryFilters = {}) {
   clashSpeedtestState = await getClashSpeedtestState({ envPath: manualClashSpeedtestPath ?? undefined });
@@ -202,12 +219,48 @@ async function getAppState(filters: HistoryFilters = {}) {
     regions: REGION_PRESETS,
     sites: testSites,
     probeSettings,
+    clashObservation: {
+      settings: clashObservationSettings,
+      summaries: db.listClashObservationSummaries(),
+      logEvents: db.listClashLogEvents(),
+    },
     runs: db.listRuns(),
     results,
     proxyHistoryStats: db.queryProxyHistoryStats(results.map((row) => row.proxyId)),
     configHistory: db.listConfigHistory(),
     clashSpeedtest: clashSpeedtestState,
   };
+}
+
+function scheduleClashObservation() {
+  if (clashObservationTimer) {
+    clearInterval(clashObservationTimer);
+    clashObservationTimer = null;
+  }
+  if (!clashObservationSettings.enabled) return;
+
+  clashObservationTimer = setInterval(() => {
+    void runAndSaveClashObservation("scheduled").catch((error) => {
+      console.warn(`[clash-observation] scheduled collection failed: ${toErrorMessage(error)}`);
+    });
+  }, clashObservationSettings.intervalMinutes * 60 * 1000);
+}
+
+async function runAndSaveClashObservation(source: "manual" | "scheduled") {
+  const bundle = await collectClashObservation(clashObservationSettings);
+  db.saveClashObservation(bundle);
+  pruneOldClashObservations();
+  if (source === "manual") {
+    window.webview.rpc?.send.progress({
+      message: bundle.run.status === "completed" ? "Clash 观测完成" : `Clash 观测失败：${bundle.run.errorMessage ?? "未知错误"}`,
+    });
+  }
+  return bundle;
+}
+
+function pruneOldClashObservations(now = new Date()) {
+  const cutoff = new Date(now.getTime() - clashObservationSettings.retentionDays * 24 * 60 * 60 * 1000);
+  db.pruneClashObservations(cutoff.toISOString());
 }
 
 function publishClashSpeedtestState(state: ClashSpeedtestState) {
@@ -259,5 +312,16 @@ function loadProbeSettings(): ProbeSettings {
     return normalizeProbeSettings(parsed);
   } catch {
     return DEFAULT_PROBE_SETTINGS;
+  }
+}
+
+function loadClashObservationSettings(): ClashObservationSettings {
+  if (!existsSync(clashObservationSettingsFile)) return DEFAULT_CLASH_OBSERVATION_SETTINGS;
+
+  try {
+    const parsed = JSON.parse(readFileSync(clashObservationSettingsFile, "utf8")) as Partial<ClashObservationSettings>;
+    return normalizeClashObservationSettings(parsed);
+  } catch {
+    return DEFAULT_CLASH_OBSERVATION_SETTINGS;
   }
 }

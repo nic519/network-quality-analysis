@@ -38,7 +38,7 @@ export function RunHistorySidebar({
         </Badge>
       </div>
 
-      <ScrollArea className="min-h-0 flex-1 p-2" viewportClassName="h-full pr-4" contentClassName="w-full space-y-1">
+      <ScrollArea className="min-h-0 flex-1 p-2" viewportClassName="h-full pr-0" contentClassName="w-full space-y-1">
         <div role="radiogroup" aria-label="历史测试" className="w-full space-y-1">
           {runItems.map((run) => {
             const isActive = effectiveSelectedRunId === run.id;

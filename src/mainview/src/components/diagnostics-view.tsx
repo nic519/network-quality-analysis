@@ -4,6 +4,7 @@ import { ClashSpeedtestInlineStatus, getDiagnosticsSummary } from "./clash-speed
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { cn } from "../lib/utils";
+import { DEFAULT_CLASH_OBSERVATION_SETTINGS, type ClashObservationSettings } from "../../../shared/clash-observation";
 import { DEFAULT_SITES } from "../../../shared/domain";
 import type { SiteDefinition } from "../../../shared/domain";
 import { PROBE_PROVIDER_PRESETS, findProbeProviderPreset, type ProbeSettings } from "../../../shared/probe-settings";
@@ -16,11 +17,14 @@ export function DiagnosticsView({
   state,
   sites,
   probeSettings,
+  clashObservation,
   onSelectBinary,
   onSetBinaryPath,
   onResetBinaryPath,
   onSaveSites,
   onSaveProbeSettings,
+  onSaveClashObservationSettings,
+  onRunClashObservation,
   onExportAllResults,
   onCopyInstallCommand,
   canExportResults,
@@ -30,11 +34,14 @@ export function DiagnosticsView({
   state: AppState["clashSpeedtest"];
   sites: SiteDefinition[];
   probeSettings: ProbeSettings;
+  clashObservation: AppState["clashObservation"];
   onSelectBinary: () => void;
   onSetBinaryPath: (path: string) => Promise<void>;
   onResetBinaryPath: () => Promise<void>;
   onSaveSites: (sites: SiteDefinition[]) => Promise<void>;
   onSaveProbeSettings: (settings: ProbeSettings) => Promise<void>;
+  onSaveClashObservationSettings: (settings: ClashObservationSettings) => Promise<void>;
+  onRunClashObservation: () => Promise<void>;
   onExportAllResults: () => void;
   onCopyInstallCommand: () => Promise<void>;
   canExportResults: boolean;
@@ -44,6 +51,7 @@ export function DiagnosticsView({
   const [manualPath, setManualPath] = useState(state.source === "manual" ? state.path ?? "" : "");
   const [draftSites, setDraftSites] = useState<SiteDefinition[]>(sites);
   const [draftProbeSettings, setDraftProbeSettings] = useState<ProbeSettings>(probeSettings);
+  const [draftClashObservationSettings, setDraftClashObservationSettings] = useState<ClashObservationSettings>(clashObservation.settings);
   const [probeProviderMode, setProbeProviderMode] = useState(getProbeProviderMode(probeSettings));
   const [didCopyInstallCommand, setDidCopyInstallCommand] = useState(false);
 
@@ -59,6 +67,10 @@ export function DiagnosticsView({
     setDraftProbeSettings(probeSettings);
     setProbeProviderMode(getProbeProviderMode(probeSettings));
   }, [probeSettings]);
+
+  useEffect(() => {
+    setDraftClashObservationSettings(clashObservation.settings);
+  }, [clashObservation.settings]);
 
   useEffect(() => {
     if (!didCopyInstallCommand) return;
@@ -277,6 +289,132 @@ export function DiagnosticsView({
             </div>
           </section>
 
+          <section className="py-5">
+            <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-sm font-semibold text-foreground">Clash 观测</h2>
+                <p className="mt-1 text-xs text-muted-foreground">定时采集 controller 快照和 warning/error 日志，用于后续复盘。</p>
+              </div>
+              <Button type="button" variant="outline" size="sm" onClick={onRunClashObservation}>
+                立即采集
+              </Button>
+            </div>
+
+            <div className="grid gap-3 px-3">
+              <label className="inline-flex h-9 items-center gap-2 text-sm text-secondary-foreground">
+                <input
+                  type="checkbox"
+                  checked={draftClashObservationSettings.enabled}
+                  onChange={(event) => updateDraftClashObservationSettings({ enabled: event.target.checked })}
+                  className="h-4 w-4 accent-[hsl(var(--primary))]"
+                  aria-label="启用 Clash 定时观测"
+                />
+                <span>启用定时观测</span>
+              </label>
+              <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_180px_180px]">
+                <label className="grid gap-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">Controller URL</span>
+                  <Input
+                    value={draftClashObservationSettings.controllerUrl}
+                    onChange={(event) => updateDraftClashObservationSettings({ controllerUrl: event.target.value })}
+                    placeholder={DEFAULT_CLASH_OBSERVATION_SETTINGS.controllerUrl}
+                  />
+                </label>
+                <label className="grid gap-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">采集间隔（分钟）</span>
+                  <Input
+                    value={String(draftClashObservationSettings.intervalMinutes)}
+                    onChange={(event) => updateDraftClashObservationSettings({ intervalMinutes: Number.parseInt(event.target.value, 10) || 1 })}
+                    placeholder="5"
+                  />
+                </label>
+                <label className="grid gap-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">保留天数</span>
+                  <Input
+                    value={String(draftClashObservationSettings.retentionDays)}
+                    onChange={(event) => updateDraftClashObservationSettings({ retentionDays: Number.parseInt(event.target.value, 10) || 30 })}
+                    placeholder="30"
+                  />
+                </label>
+              </div>
+              <label className="grid gap-1.5">
+                <span className="text-xs font-medium text-muted-foreground">Secret / Token</span>
+                <Input
+                  value={draftClashObservationSettings.secret}
+                  onChange={(event) => updateDraftClashObservationSettings({ secret: event.target.value })}
+                  placeholder="留空表示 controller 未启用 secret"
+                />
+              </label>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap gap-3 text-sm text-secondary-foreground">
+                  {(["warning", "error"] as const).map((level) => (
+                    <label key={level} className="inline-flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={draftClashObservationSettings.logLevels.includes(level)}
+                        onChange={(event) => toggleDraftLogLevel(level, event.target.checked)}
+                        className="h-4 w-4 accent-[hsl(var(--primary))]"
+                        aria-label={`采集 ${level} 日志`}
+                      />
+                      <span>{level}</span>
+                    </label>
+                  ))}
+                </div>
+                <Button type="button" size="sm" onClick={() => onSaveClashObservationSettings(draftClashObservationSettings)}>
+                  <Save className="h-4 w-4" />
+                  保存观测设置
+                </Button>
+              </div>
+              <div className="grid gap-2 rounded-md border border-border bg-secondary/25 p-3">
+                <div className="grid gap-1">
+                  <h3 className="text-xs font-semibold text-muted-foreground">最近观测</h3>
+                  {clashObservation.summaries.length ? (
+                    <div className="grid gap-1 text-xs text-secondary-foreground">
+                      {clashObservation.summaries.slice(0, 4).map((summary) => (
+                        <div key={summary.id} className="grid gap-1 border-t border-border/70 py-2 first:border-t-0 first:pt-0">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="font-mono text-[11px]">{summary.id}</span>
+                            <span className={summary.status === "completed" ? "text-primary" : "text-destructive"}>
+                              {summary.status === "completed" ? "完成" : "失败"}
+                            </span>
+                          </div>
+                          <div className="text-muted-foreground">
+                            {formatObservationTime(summary.startedAt)} · 节点 {summary.proxyCount} · 连接 {summary.connectionSampleCount} · 事件{" "}
+                            {summary.logEventCount}
+                          </div>
+                          {summary.errorMessage ? <div className="text-destructive">{summary.errorMessage}</div> : null}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">还没有观测记录。保存设置后等待定时采集，或点击“立即采集”。</p>
+                  )}
+                </div>
+                <div className="grid gap-1 border-t border-border/70 pt-3">
+                  <h3 className="text-xs font-semibold text-muted-foreground">最近日志事件</h3>
+                  {clashObservation.logEvents.length ? (
+                    <div className="grid gap-1 text-xs">
+                      {clashObservation.logEvents.slice(0, 5).map((event) => (
+                        <div key={`${event.observationId}-${event.id ?? event.eventTime}-${event.message}`} className="grid gap-1 rounded border border-border/70 px-2 py-1.5">
+                          <div className="flex flex-wrap gap-2 text-muted-foreground">
+                            <span>{event.eventTime ? formatObservationTime(event.eventTime) : "未知时间"}</span>
+                            <span>{event.level}</span>
+                            <span>{event.eventType}</span>
+                            {event.domain ? <span>{event.domain}</span> : null}
+                            {event.proxyName ? <span>{event.proxyName}</span> : null}
+                          </div>
+                          <div className="break-words text-secondary-foreground">{event.message}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">最近没有 warning/error 日志事件。</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </section>
+
           <section className="grid gap-3 py-5">
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-sm font-semibold text-foreground">测速工具状态</h2>
@@ -383,10 +521,30 @@ export function DiagnosticsView({
     setDraftProbeSettings((current) => ({ ...current, ...patch }));
   }
 
+  function updateDraftClashObservationSettings(patch: Partial<ClashObservationSettings>) {
+    setDraftClashObservationSettings((current) => ({ ...current, ...patch }));
+  }
+
+  function toggleDraftLogLevel(level: "warning" | "error", checked: boolean) {
+    setDraftClashObservationSettings((current) => {
+      const levels = checked ? [...current.logLevels, level] : current.logLevels.filter((item) => item !== level);
+      return { ...current, logLevels: [...new Set(levels)] };
+    });
+  }
+
   function selectProbeProviderPreset(settings: ProbeSettings, providerId: string) {
     setProbeProviderMode(providerId);
     setDraftProbeSettings((current) => ({ ...settings, enabled: current.enabled }));
   }
+}
+
+function formatObservationTime(value: string) {
+  return new Date(value).toLocaleString("zh-CN", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 const themeOptions: Array<{ id: ThemeMode; label: string; icon: typeof Monitor }> = [

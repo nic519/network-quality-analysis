@@ -1,4 +1,5 @@
 import { Electroview } from "electrobun/view";
+import { DEFAULT_CLASH_OBSERVATION_SETTINGS, type ClashObservationSettings } from "../../../shared/clash-observation";
 import { DEFAULT_SITES, REGION_PRESETS, latencyToMs, type HistoryFilters, type RegionPreset, type ResultRow } from "../../../shared/domain";
 import { DEFAULT_PROBE_SETTINGS } from "../../../shared/probe-settings";
 import { APP_RPC_TIMEOUT_MS, type AppRPC } from "../../../shared/rpc";
@@ -7,10 +8,12 @@ import type {
   ClashSpeedtestState,
   ConfigInspectionResult,
   ExportCsvResponse,
+  GetClashObservationDetailParams,
   InspectConfigParams,
   DeleteRunParams,
   ResetClashSpeedtestBinaryPathResponse,
   RunProgressState,
+  SetClashObservationSettingsParams,
   SetProbeSettingsParams,
   SetClashSpeedtestBinaryPathParams,
   SetTestSitesParams,
@@ -78,6 +81,35 @@ function createPreviewApi() {
     regions: REGION_PRESETS,
     sites: DEFAULT_SITES,
     probeSettings: DEFAULT_PROBE_SETTINGS,
+    clashObservation: {
+      settings: DEFAULT_CLASH_OBSERVATION_SETTINGS,
+      summaries: [
+        {
+          id: "obs-preview",
+          startedAt: "2026-05-20T10:00:00.000Z",
+          completedAt: "2026-05-20T10:00:03.000Z",
+          status: "completed",
+          controllerUrl: DEFAULT_CLASH_OBSERVATION_SETTINGS.controllerUrl,
+          errorMessage: null,
+          proxyCount: 12,
+          connectionSampleCount: 4,
+          logEventCount: 2,
+        },
+      ],
+      logEvents: [
+        {
+          id: 1,
+          observationId: "obs-preview",
+          eventTime: "2026-05-20T10:00:02.000Z",
+          level: "warning",
+          eventType: "dns",
+          message: "[DNS] github.com lookup failed",
+          proxyName: "",
+          domain: "github.com",
+          rule: "",
+        },
+      ],
+    },
     configHistory: [
       {
         path: "/Users/nicholas/Library/Application Support/mihomo-party/profiles/config.yaml",
@@ -188,6 +220,93 @@ function createPreviewApi() {
       progressHandler?.(`浏览器预览模式：已保存 Probe API ${settings.url}`);
       sample.probeSettings = settings;
       return settings;
+    },
+    setClashObservationSettings: async ({ settings }: SetClashObservationSettingsParams) => {
+      progressHandler?.("浏览器预览模式：已保存 Clash 观测设置");
+      sample.clashObservation.settings = settings as ClashObservationSettings;
+      return getFilteredState({});
+    },
+    getClashObservationDetail: async ({ observationId }: GetClashObservationDetailParams) => {
+      const summary = sample.clashObservation.summaries.find((item) => item.id === observationId);
+      if (!summary) return null;
+      return {
+        summary,
+        config: {
+          observationId,
+          mode: "rule",
+          logLevel: "warning",
+          mixedPort: "7890",
+          httpPort: "",
+          socksPort: "",
+          ipv6: "true",
+          allowLan: "false",
+          configHash: "preview-hash",
+        },
+        proxies: [
+          {
+            observationId,
+            proxyName: "Proxy",
+            proxyType: "Selector",
+            nowProxy: "HK-01",
+            alive: "true",
+            delayMs: 45,
+            historyJson: JSON.stringify([{ delay: 52 }, { delay: 45 }]),
+            childrenJson: JSON.stringify(["HK-01", "HK-02"]),
+          },
+          {
+            observationId,
+            proxyName: "HK-01",
+            proxyType: "Trojan",
+            nowProxy: "",
+            alive: "true",
+            delayMs: 128,
+            historyJson: JSON.stringify([{ delay: 128 }]),
+            childrenJson: "[]",
+          },
+        ],
+        rules: [
+          {
+            observationId,
+            ruleIndex: 0,
+            ruleType: "RuleSet",
+            payload: "github",
+            proxy: "Proxy",
+          },
+        ],
+        connections: [
+          {
+            observationId,
+            domain: "github.com",
+            destinationIp: "140.82.112.4",
+            sourceIp: "192.168.1.2",
+            rule: "RuleSet",
+            rulePayload: "github",
+            chain: "Proxy > HK-01",
+            connectionCount: 2,
+            upload: 150,
+            download: 370,
+          },
+        ],
+        logEvents: sample.clashObservation.logEvents.filter((event) => event.observationId === observationId),
+      };
+    },
+    runClashObservation: async () => {
+      progressHandler?.("浏览器预览模式：已执行 Clash 观测");
+      sample.clashObservation.summaries = [
+        {
+          id: `obs-preview-${sample.clashObservation.summaries.length + 1}`,
+          startedAt: new Date().toISOString(),
+          completedAt: new Date().toISOString(),
+          status: "completed",
+          controllerUrl: sample.clashObservation.settings.controllerUrl,
+          errorMessage: null,
+          proxyCount: 12,
+          connectionSampleCount: 4,
+          logEventCount: sample.clashObservation.logEvents.length,
+        },
+        ...sample.clashObservation.summaries,
+      ];
+      return getFilteredState({});
     },
     openExternalUrl: async ({ url }: { url: string }) => {
       window.open(url, "_blank", "noopener,noreferrer");

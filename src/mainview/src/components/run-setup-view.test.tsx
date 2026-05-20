@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { RunSetupView } from "./run-setup-view";
 import type { AppState, ConfigInspectionResult, RunProgressState } from "../../../shared/rpc";
+import { DEFAULT_CLASH_OBSERVATION_SETTINGS } from "../../../shared/clash-observation";
 import { DEFAULT_PROBE_SETTINGS } from "../../../shared/probe-settings";
 
 const state: AppState = {
@@ -14,6 +15,11 @@ const state: AppState = {
     { id: "github", name: "GitHub", url: "https://github.com", enabled: true },
   ],
   probeSettings: DEFAULT_PROBE_SETTINGS,
+  clashObservation: {
+    settings: DEFAULT_CLASH_OBSERVATION_SETTINGS,
+    summaries: [],
+    logEvents: [],
+  },
   runs: [],
   results: [],
   proxyHistoryStats: {},

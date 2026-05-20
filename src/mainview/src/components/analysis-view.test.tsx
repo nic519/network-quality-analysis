@@ -6,6 +6,7 @@ import { RunHistorySidebar } from "./run-history-sidebar";
 import { ProbeDetailsPanel } from "./probe-details-panel";
 import { getEffectiveSelectedRunId, getVisibleRunItems } from "../lib/analysis-data";
 import type { AppState } from "../../../shared/rpc";
+import { DEFAULT_CLASH_OBSERVATION_SETTINGS } from "../../../shared/clash-observation";
 import { DEFAULT_PROBE_SETTINGS } from "../../../shared/probe-settings";
 import { DEFAULT_SITES, REGION_PRESETS, type ResultRow } from "../../../shared/domain";
 
@@ -628,6 +629,11 @@ function makeState(results: ResultRow[]): AppState {
     regions: REGION_PRESETS,
     sites: DEFAULT_SITES,
     probeSettings: DEFAULT_PROBE_SETTINGS,
+    clashObservation: {
+      settings: DEFAULT_CLASH_OBSERVATION_SETTINGS,
+      summaries: [],
+      logEvents: [],
+    },
     runs: [
       {
         id: "run-1",

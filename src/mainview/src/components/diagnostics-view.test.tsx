@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { DiagnosticsView } from "./diagnostics-view";
 import type { AppState } from "../../../shared/rpc";
 import type { SiteDefinition } from "../../../shared/domain";
+import { DEFAULT_CLASH_OBSERVATION_SETTINGS } from "../../../shared/clash-observation";
 import { DEFAULT_PROBE_SETTINGS } from "../../../shared/probe-settings";
 
 const state: AppState["clashSpeedtest"] = {
@@ -23,11 +24,18 @@ describe("DiagnosticsView", () => {
         state={state}
         sites={sites}
         probeSettings={DEFAULT_PROBE_SETTINGS}
+        clashObservation={{
+          settings: DEFAULT_CLASH_OBSERVATION_SETTINGS,
+          summaries: [],
+          logEvents: [],
+        }}
         onSelectBinary={() => {}}
         onSetBinaryPath={async () => {}}
         onResetBinaryPath={async () => {}}
         onSaveSites={async () => {}}
         onSaveProbeSettings={async () => {}}
+        onSaveClashObservationSettings={async () => {}}
+        onRunClashObservation={async () => {}}
         onExportAllResults={() => {}}
         onCopyInstallCommand={async () => {}}
         canExportResults={false}
@@ -69,19 +77,72 @@ describe("DiagnosticsView", () => {
     expect(html).toContain("<span class=\"text-xs font-medium text-muted-foreground\">Probe URL</span>");
     expect(html).toContain("ip=query,country=country");
   });
+
+  test("renders clash observation settings and recent review data", () => {
+    const html = renderDiagnosticsView(DEFAULT_PROBE_SETTINGS, {
+      settings: {
+        ...DEFAULT_CLASH_OBSERVATION_SETTINGS,
+        enabled: true,
+        controllerUrl: "http://127.0.0.1:9090",
+      },
+      summaries: [
+        {
+          id: "obs-1",
+          startedAt: "2026-05-20T10:00:00.000Z",
+          completedAt: "2026-05-20T10:00:03.000Z",
+          status: "completed",
+          controllerUrl: "http://127.0.0.1:9090",
+          errorMessage: null,
+          proxyCount: 8,
+          connectionSampleCount: 3,
+          logEventCount: 2,
+        },
+      ],
+      logEvents: [
+        {
+          id: 1,
+          observationId: "obs-1",
+          eventTime: "2026-05-20T10:00:02.000Z",
+          level: "warning",
+          eventType: "dns",
+          message: "[DNS] github.com lookup failed",
+          proxyName: "",
+          domain: "github.com",
+          rule: "",
+        },
+      ],
+    });
+
+    expect(html).toContain("Clash 观测");
+    expect(html).toContain("Controller URL");
+    expect(html).toContain("http://127.0.0.1:9090");
+    expect(html).toContain("立即采集");
+    expect(html).toContain("obs-1");
+    expect(html).toContain("[DNS] github.com lookup failed");
+  });
 });
 
-function renderDiagnosticsView(probeSettings = DEFAULT_PROBE_SETTINGS) {
+function renderDiagnosticsView(
+  probeSettings = DEFAULT_PROBE_SETTINGS,
+  clashObservation: AppState["clashObservation"] = {
+    settings: DEFAULT_CLASH_OBSERVATION_SETTINGS,
+    summaries: [],
+    logEvents: [],
+  },
+) {
   return renderToStaticMarkup(
     <DiagnosticsView
       state={state}
       sites={sites}
       probeSettings={probeSettings}
+      clashObservation={clashObservation}
       onSelectBinary={() => {}}
       onSetBinaryPath={async () => {}}
       onResetBinaryPath={async () => {}}
       onSaveSites={async () => {}}
       onSaveProbeSettings={async () => {}}
+      onSaveClashObservationSettings={async () => {}}
+      onRunClashObservation={async () => {}}
       onExportAllResults={() => {}}
       onCopyInstallCommand={async () => {}}
       canExportResults={false}

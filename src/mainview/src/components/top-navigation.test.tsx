@@ -10,6 +10,7 @@ describe("TopNavigation", () => {
     expect(html).toContain('role="tablist"');
     expect(html).toContain("历史结果");
     expect(html).toContain("趋势分析");
+    expect(html).toContain("观测复盘");
     expect(html).toContain('aria-selected="true"');
   });
 });
