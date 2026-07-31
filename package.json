@@ -8,6 +8,7 @@
     "dev:watch": "bun run build:css && electrobun dev --watch",
     "build": "bun run build:css && ELECTROBUN_BUILD_ENV=stable electrobun build --env=stable",
     "build:dev": "bun run build:css && ELECTROBUN_BUILD_ENV=dev electrobun build --env=dev",
+    "verify:app": "bun scripts/verify-local-app.ts stable",
     "build:css": "tailwindcss -i src/mainview/src/index.css -o src/mainview/electrobun.css --minify",
     "build:web": "vite build",
     "test": "bun test",
@@ -30,7 +31,7 @@
     "yaml": "^2.9.0"
   },
   "devDependencies": {
-    "@types/bun": "latest",
+    "@types/bun": "1.3.14",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@types/three": "^0.184.1",

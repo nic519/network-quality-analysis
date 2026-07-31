@@ -9,7 +9,7 @@ Latency Compass 是一个基于 Electrobun 的桌面应用，用于通过 `clash
 - 内置香港和日本两个地区预设。
 - 支持配置测试站点，默认包含 YouTube、X 和 GitHub。
 - 引导用户通过 `go install github.com/nic519/clash-speedtest@latest` 安装 `clash-speedtest`。
-- 将历史记录存储在 `~/Library/Application Support/Latency Compass/latency-compass.sqlite`。
+- 将历史记录存储在 Electrobun 提供的当前平台用户数据目录；升级时会从旧版 macOS 目录 `~/Library/Application Support/Latency Compass` 迁移缺失的数据文件，且不会覆盖新目录中的已有数据。
 - 展示汇总卡片，以及按节点和站点排列的延迟矩阵。
 - 支持将当前筛选结果导出为汇总 CSV 文件到指定文件夹。
 
@@ -59,6 +59,13 @@ bun run build:web
 bun run dev
 ```
 
+验证发布构建是否能真正启动并创建窗口：
+
+```bash
+bun run build
+bun run verify:app
+```
+
 ## UI 组件约定
 
 本项目使用 shadcn/ui 风格组件，凡是 shadcn/Radix 已提供的常见 UI 模式，应优先使用或安装对应组件，不要先手写一套同类组件。常见例子包括弹窗、确认框、下拉菜单、表格、按钮、卡片、输入框、滚动区域等。
@@ -82,7 +89,7 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-该工作流会先运行测试和类型检查，然后为 macOS 和 Windows 构建桌面应用。构建完成后，压缩包会同时上传到 Actions 运行记录，以及对应 tag 的 GitHub Release。
+该工作流会先运行测试和类型检查，然后为 macOS 和 Windows 构建桌面应用，并在各自平台启动打包后的 launcher、确认窗口已创建。验证通过后，压缩包会同时上传到 Actions 运行记录，以及对应 tag 的 GitHub Release。
 
 应用界面中需要填写本地 Clash/Mihomo 配置路径或订阅 URL。第一版暂不支持用户自定义筛选规则；选择 `香港` 或 `日本` 时，会使用 `src/shared/domain.ts` 中定义的地区正则。
 

@@ -1,5 +1,4 @@
 import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import { ApplicationMenu, BrowserView, BrowserWindow, Utils } from "electrobun/bun";
 import { collectClashObservation } from "./clash-observation";
@@ -7,16 +6,19 @@ import { writeCsvExport } from "./csv";
 import { inspectConfigRegions } from "./config-inspection";
 import { LatencyDatabase } from "./db";
 import { chooseClashSpeedtestBinary, chooseConfigFile, chooseExportDirectory } from "./file-dialog";
+import { openExternalUrl } from "./external-url";
 import { buildApplicationMenu } from "./menu";
 import { runLatencyTest } from "./runner";
+import { migrateLegacyMacUserData } from "./user-data";
 import { getClashSpeedtestState, makeClashSpeedtestState } from "./clash-speedtest";
 import { DEFAULT_SITES, REGION_PRESETS, normalizeSiteDefinitions, type HistoryFilters, type SiteDefinition } from "../shared/domain";
 import { DEFAULT_CLASH_OBSERVATION_SETTINGS, normalizeClashObservationSettings, type ClashObservationSettings } from "../shared/clash-observation";
 import { DEFAULT_PROBE_SETTINGS, normalizeProbeSettings, type ProbeSettings } from "../shared/probe-settings";
 import { APP_RPC_TIMEOUT_MS, type AppRPC, type ClashSpeedtestState } from "../shared/rpc";
 
-const appDir = join(homedir(), "Library/Application Support/Latency Compass");
+const appDir = Utils.paths.userData;
 mkdirSync(appDir, { recursive: true });
+migrateLegacyMacUserData({ appDirectory: appDir });
 const manualBinaryPathFile = join(appDir, "clash-speedtest-manual-path.txt");
 const testSitesFile = join(appDir, "test-sites.json");
 const probeSettingsFile = join(appDir, "probe-settings.json");
@@ -120,7 +122,7 @@ const rpc = BrowserView.defineRPC<AppRPC>({
       },
       getClashObservationDetail: async ({ observationId }) => db.getClashObservationDetail(observationId),
       openExternalUrl: async ({ url }) => {
-        await openExternalUrl(url);
+        openExternalUrl(url, Utils.openExternal);
         return null;
       },
       startRun: async ({ configPath, regionIds }) => {
@@ -203,6 +205,12 @@ window = new BrowserWindow<typeof rpc>({
   },
   rpc,
 });
+if (Bun.env.LATENCY_COMPASS_VERIFY_LOCAL_APP) {
+  await Bun.write(
+    Bun.env.LATENCY_COMPASS_VERIFY_LOCAL_APP,
+    JSON.stringify({ marker: "[latency-compass] BrowserWindow created", pid: process.pid }),
+  );
+}
 scheduleClashObservation();
 
 async function getAppState(filters: HistoryFilters = {}) {
@@ -274,17 +282,6 @@ async function awaitExportDirectory() {
 
 function toErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
-}
-
-async function openExternalUrl(url: string) {
-  const proc = Bun.spawn(["open", url], {
-    stdout: "ignore",
-    stderr: "pipe",
-  });
-  const [stderr, exitCode] = await Promise.all([new Response(proc.stderr).text(), proc.exited]);
-  if (exitCode !== 0) {
-    throw new Error(stderr.trim() || `无法打开外部链接：${url}`);
-  }
 }
 
 function loadManualClashSpeedtestPath() {
